@@ -1,5 +1,5 @@
 # science-plan
-Code and data used to make figures 3, 4, 5 & 8 in the Science Plan.
+Code and data used to make figures 3, 4, 5 & 8 in the [Science Plan](https://resources.ca.gov/Initiatives/Voluntary-Agreements-Page/Science).
 
 # The Science Plan includes eight figures:
 1. Figures 1, 2 & 7 are conceptual/illustrative.
