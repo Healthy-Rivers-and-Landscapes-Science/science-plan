@@ -1,0 +1,332 @@
+---
+title: "Flow-Habitat Area Curves"
+author: "Department of Water Resources Healthy Rivers and Landscapes Team"
+date: "`r gsub(' 0([1-9])', ' \\1', format(Sys.Date(), '%B %d, %Y'))`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+<style>
+/* section header spacing */
+h1, h2, h3, h4 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+/* figure spacing */
+img {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+</style>
+
+```{r set_up, include = FALSE}
+knitr::opts_chunk$set(fig.align = "center")
+knitr::opts_chunk$set(out.width = "70%")
+
+white <- "#ffffff"
+light_grey <- "#f7f7f7"
+mid_grey <- "#d3d3d3"
+```
+
+
+
+# Introduction
+
+Parties to the Voluntary Agreements have committed to restoring habitat in 
+the Sacramento River watershed (Table 1).
+
+```{r create_hab_commitments, echo = FALSE}
+hab_commitments <- tibble::tribble(
+  ~system,                                       ~spawning_acres, ~rearing_acres, ~instream_acres, ~floodplain_acres,
+  "Sacramento",                                  113.5,           0,              137.5,           0,
+  "Sutter Bypass, Butte Sink, and Colusa Basin", 0,               0,              0,               20000,
+  "Feather",                                     15,              0,              5.25,            0,
+  "Yuba",                                        0,               0,              50,              100,
+  "American",                                    25,              75,             0,               0,
+  "Mokelumne",                                   0,               0,              1,               25,                       
+  "Putah",                                       1.4,             0,              0,               0,
+  "North Delta Arc and Suisun Marsh",            0,               0,              0,               5227.5
+)
+
+add_row <- data.frame(
+  system = "Total",
+  spawning_acres   = sum(hab_commitments$spawning_acres),
+  rearing_acres    = sum(hab_commitments$rearing_acres),
+  instream_acres   = sum(hab_commitments$instream_acres),
+  floodplain_acres = sum(hab_commitments$floodplain_acres)
+)
+
+hab_commitments_disp <- rbind(hab_commitments, add_row)
+
+hab_col_names <- c(
+  "System",
+  "Spawning Acres",
+  "Rearing Acres",
+  "Instream Acres",
+  "Floodplain Acres"
+)
+
+hab_commitments_disp |>
+  dplyr::mutate(dplyr::across(tidyselect::where(is.numeric), ~ scales::comma(.))) |>
+  knitr::kable(
+    align = c("l", rep("r", ncol(hab_commitments_disp) - 1)),
+    col.names = hab_col_names,
+    caption = "Table 1: Habitat restoration commitments made by Voluntary Agreements parties"
+  ) |>
+  kableExtra::kable_styling(
+    full_width = FALSE, 
+    latex_options = c("striped", "hold_position")
+  ) |>
+  kableExtra::row_spec(row = 0, background = mid_grey) |>
+  kableExtra::row_spec(
+    row = seq(from = 1, to = nrow(hab_commitments_disp) - 1, by = 2),
+    background = light_grey
+  ) |>
+  kableExtra::row_spec(
+    row = nrow(hab_commitments_disp),
+    background = mid_grey,
+    bold = TRUE
+  )
+```
+
+Restored sites will be designed and constructed with water depth and velocity 
+criteria over a range of flows that are suitable for target species. Tributary 
+sites will be oriented toward salmonids, while Delta sites will address the 
+habitat needs of a wider range of native fishes (e.g. delta smelt and longfin 
+smelt).
+
+Because of this, habitat accounting in tributaries includes development and/or 
+refinement of  flow-habitat area relationships over a range of flows expected at 
+restored sites under the flow commitments associated with the Voluntary 
+Agreements program and resulting hydrographs. This document discusses the 
+flow-habitat area relationships proposed by Voluntary Agreements parties and 
+those proposed by the State Water Resources Control Board (SWRCB) as related to 
+restoration site design, habitat accounting and consistency assessments.
+
+
+
+## Documents
+
+There are three documents that address habitat accounting under the Voluntary 
+Agreements:
+
+* The [**SWRCB Scientific Basis Report Supplement**](https://www.waterboards.ca.gov/waterrights/water_issues/programs/bay_delta/docs/2023/staff-report/app-g2.pdf) 
+documents the science supporting the proposed provisions included in the 
+Voluntary Agreements and was developed by SWRCB staff with the support of 
+Department of Water Resources (DWR) and California Department of Fish and 
+Wildlife (CDFW) staff
+
+* The [**Draft Voluntary Agreements Strategic Plan Appendix F**](https://resources.ca.gov/-/media/CNRA-Website/Files/Initiatives/Support-Healthy-Rivers-and-Landscape/AppF_HabitatAccountingProtocol.pdf) 
+documents a method for non-flow measure (habitat restoration) accounting 
+proposed by the parties to the Voluntary Agreements
+
+* The [**SWRCB Draft Program of Implementation**](https://waterboards.ca.gov/waterrights/water_issues/programs/bay_delta/docs/2024/drft-sacdelta-bdplan-updates.pdf) 
+provides pathways for implementing that Bay-Delta Water Quality Control 
+Plan that incorporate the Voluntary Agreements with amendments recommended by 
+SWRCB staff
+
+
+
+# SWRCB Scientific Basis Report Supplement
+
+In the Final Scientific Basis Report Supplement, SWRCB staff authors detail an 
+approach for estimating and tracking suitable habitat areas for salmonid 
+spawning and rearing by linking flow rates to habitat suitability. To develop 
+appropriate restoration depth and flow criteria, FlowWest staff and experts 
+compiled a dataset of flow-to-habitat relationships for Central Valley 
+watersheds, drawn from published studies, and attempted to validate the dataset 
+using on-the-ground observations produced by experts working in each watershed 
+(Figure 1). 
+
+```{r fig1_hab_suitability_spawning, fig.cap = "Figure 1: Spawning habitat suitability criteria", echo = FALSE}
+knitr::include_graphics(path = here::here("workshop", "figs", "fig1_hab_suitability_spawning.png"))
+```
+
+Habitat suitability is measured as weighted usable area per channel length. This 
+index, derived from a combination of hydrodynamic modeling and physical habitat 
+modeling, assess the impact of depth and velocity on habitat conditions. The 
+weighted usable area is calculated using depth and velocity criteria specific to 
+each tributary, which are based on observation of fish presence in different 
+conditions. The resulting flow-to-suitable-area relationships provide 
+time-series data that estimate total suitable habitat as a function of modeled
+hydrology for each tributary or, in some cases, tributary reach. 
+
+For each restoration site, flow-habitat curves indicate the potential habitat 
+area that meets the suitability standards at different flow rates. This allows 
+project planners to estimate how much suitable habitat will be available at the 
+design flow (the expected flow rate during salmonid life stages). Project 
+outcomes are evaluated based on whether the added habitat area remains within 
+suitable criteria across expected flow ranges.
+
+Lastly, it is expected that for rearing habitat, cover features constitute a
+minimum of 20% of the total habitat area.
+
+
+
+## Draft Voluntary Agreements Strategic Plan Appendix F
+
+Habitat accounting for tributary spawning, in-channel rearing, and tributary 
+floodplain rearing habitat enhancement measures accounts for the acreage of
+implemented habitat enhancement measures based on design criteria for specific 
+projects. Design criteria include water depth and water velocity, as well as 
+substrate for spawning measures, and cover for tributary in-channel and 
+tributary floodplain rearing measures. 
+
+Habitat accounting is a site-specific assessment that will be conducted at the 
+completion of each individual project's construction and will serve as an 
+incremental accounting step for whether Voluntary Agreements parties have met 
+their non-flow habitat total acreage commitments (Table 1). Site-specific 
+assessments must quantify the areas within a project's boundary that conform 
+with specific design criteria at design flows, the range of flows over which a 
+habitat enhancement project is designed to create habitat. A project's design 
+flows may be informed by habitat objectives, habitat features, biological 
+objectives, and riverine processes. Flows at which pre-project and as-built 
+conditions are compared must be identical.
+
+The design criteria will incorporate water depth and velocity, which includes 
+development or refinement of habitat-flow relationships over a range of flows 
+reflective of those assumed in the SWRCB Scientific Basis Report 
+Supplement for each tributary. Development of new or revised habitat-flow 
+relationships will form the basis of a consistency assessment that will compare 
+the availability of habitat over the range of applicable flows realized through 
+implementation with the assumptions made in the SWRCB Scientific Basis Report 
+Supplement. 
+
+
+
+### Pre-project characterization
+
+To characterize projects before construction, the project sponsor will:
+
+1. Characterize pre-project physical conditions, including topography, 
+substrate, and cover. 
+2. Construct a digital elevation model of the project footprint and create  
+substrate and cover rasters.
+3. Apply two-dimensional hydraulic models to calculate water depths and 
+velocities for each computational pixel in the project footprint at each 
+modeled flow within the range of design flows.
+4. Determine where design criteria (water depth and velocity) are met at each 
+modeled flow within the range of design flows for each computational pixel in 
+the project footprint using hydraulic (e.g. water depth and velocity) and
+non-hydraulic (e.g. substrate) criteria as binary functions. If a computational 
+pixel corresponds with the hydraulic and applicable non-hydraulic  
+criteria, the pixel is considered to meet design criteria. 
+5. Sum the area of all computational pixels in the project's footprint that meet 
+design criteria to identify the explicit area (acres) of habitat that meet 
+design criteria at each modeled flow in the range of design flows. 
+
+See Figure 2 for a graphical illustration of pre-project characterization. 
+
+```{r fig2_preproject_characterization, fig.cap = "Figure 2: Spawning habitat pre-project characterization", echo = FALSE}
+knitr::include_graphics(path = here::here("workshop", "figs", "fig2_preproject_characterization.png"))
+```
+
+
+
+### As-built characterization
+
+The process for characterizing projects once built will be the same pre-project 
+characterization, including new characterization of physical conditions and the 
+development of necessary rasters. 
+
+
+
+### Pre-project and as-built differencing
+
+Once the as-built project has been characterized, the pre-project and as-built 
+characterizations will be compared to determine the pixels for which additional 
+habitat has been constructed (i.e. design criteria are newly met) and the pixels 
+for which habitat has been lost (i.e. design criteria were met before the 
+project but are no longer met in the as-built project) (Figure 3). This 
+comparison will be conducted for all modeled design flows, starting with the 
+lowest design flow. The pre-project and as-built comparison will focus 
+exclusively on areas newly wetted by each increase in design flow. 
+
+```{r fig3_project_differencing, fig.cap = "Figure 3: Spawning habitat pre-project and as-built comparison", echo = FALSE}
+knitr::include_graphics(path = here::here("workshop", "figs", "fig3_project_differencing.png"))
+```
+
+For each tributary rearing habitat enhancement, an area meeting hydraulic 
+criteria is counted as rearing habitat only if at least 20% of its area includes 
+cover features with a habitat suitability index of at least 0.5. To 
+determine the extent of cover, cover features within the project footprint 
+should be mapped and then digitized to produce a spatial file (e.g. shapefile) 
+(Figure 4). Because juvenile salmonids are typically found within three ft of 
+cover elements (see e.g. Moniz and Pasternack 2019 and Hardy et al. 2006), each 
+suitable non-cobble cover feature element (e.g. boulders or large woody debris) 
+should be buffered by three feet in all directions. Then, the cover spatial file 
+should be converted to a raster, where each raster pixel with a centroid that 
+falls within the buffered cover spatial file is assigned that cover type.
+
+```{r fig4_cover_raster, fig.cap = "Figure 4: Developing a cover raster", echo = FALSE}
+knitr::include_graphics(path = here::here("workshop", "figs", "fig4_cover_raster.png"))
+```
+
+Cover will be evaluated at project completion in accordance with full 
+implementation of the project design (e.g. vegetation at maturity). Estimates of 
+riparian vegetation area should be species-specific estimates of mature canopy 
+size.
+
+If less than 20% of the final, as-built rearing project area has cover, 
+quantified using this methodology, no newly constructed habitat is counted.
+
+
+
+## SWRCB Draft Program of Implementation 
+
+The SWRCB Draft Program of Implementation for the Bay-Delta Water Quality 
+Control Plan specific water depth and velocity design criteria for spawning 
+habitat, instream rearing habitat, and tributary floodplain rearing habitat 
+(Table 2).
+
+```{r create_design_criteria, echo = FALSE}
+poi_design_criteria <- tibble::tribble(
+  ~hab_type,              ~depth_ft,    ~velocity_cfs,
+  "spawning",             "1.0 to 2.5", "1.0 to 4.0",
+  "rearing - instream",   "0.5 to 4.0", "0.0 to 3.0",
+  "rearing - floodplain", "0.5 to 4.0", "0.0 to 3.0"
+)
+
+poi_col_names <- c("Habitat Type", "Depth (ft)", "Velocity (ft$^3$/sec)")
+
+poi_design_criteria |>
+  knitr::kable(
+    align = c("l", rep("c", ncol(poi_design_criteria) - 1)),
+    col.names = poi_col_names,
+    caption = "Table 2: Tributary habitat design criteria"
+  ) |>
+  kableExtra::kable_styling(
+    full_width = FALSE, 
+    latex_options = c("striped", "hold_position")
+  ) |>
+  kableExtra::row_spec(row = 0, background = mid_grey) |>
+  kableExtra::row_spec(
+    row = seq(from = 1, to = nrow(poi_design_criteria) - 1, by = 2),
+    background = light_grey
+  )
+```
+
+The pre-project and as-built characterization steps in the Draft Program of 
+Implementation are functionally equivalent to those in Appendix F, with the 
+notable exception that the Draft Program of Implementation specifies that the 
+areal extent of a cover feature *should not* be buffered. Additionally, habitat 
+verification must occur to confirm that the acreage of habitat meeting design 
+criteria across a range of flows conforms with or provides equivalent benefits 
+to the flow-habitat relationships provided in the SWRCB Scientific Basis Report 
+Supplement (the "assumed flow-habitat relationships"). 
+
+To account for newly constructed habitat, in the final habitat accounting 
+assessment, compare the constructed (as-built) flow-habitat relationship to the 
+flow-habitat relationships used in the SWRCB Scientific Basis Report Supplement:
+
+1. Within each design flow, add the constructed flow-habitat relationships 
+across projects to create an overall constructed flow-habitat relationship for 
+each *habitat type* and *tributary or reach*, matching the spatial scale of the 
+assumed flow-habitat relationship. 
+
+2. Compare this constructed flow-habitat relationship to the assumed 
+flow-habitat relationships
+
