@@ -426,7 +426,7 @@ ggplot(flows, aes(
   )) +
   annotate(
     "rect",
-    xmin = 93, xmax = 244,
+    xmin = 93, xmax = 274,
     ymin = -Inf, ymax = Inf,
     fill = mid_grey,
     alpha = 0.5
@@ -502,3 +502,32 @@ ggplot(flows, aes(x = exceedance, y = parameter_value, color = facet_label)) +
     axis.title.y = element_text(margin = margin(r = 20))
   )
 ```
+
+
+
+# Flow-habitat curves
+
+```{r import_from_edi}
+package_id <- "edi.1511.1"
+
+entity_names <- EDIutils::read_data_entity_names(packageId = package_id)
+entity_names$entityName <- snakecase::to_any_case(
+  entity_names$entityName,
+  case = "snake"
+)
+
+for (i in seq_len(nrow(entity_names))) {
+  entity_id <- entity_names$entityId[i]
+  entity_name <- entity_names$entityName[i]
+  
+  data_entity <- EDIutils::read_data_entity(
+    packageId = package_id,
+    entityId = entity_id
+  )
+  
+  data_read <- readr::read_csv(file = data_entity)
+  
+  assign(x = entity_name, value = data_read)
+}
+```
+
