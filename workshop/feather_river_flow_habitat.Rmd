@@ -1,0 +1,789 @@
+---
+title: "Flow-Habitat Area Curves"
+author: "Department of Water Resources Healthy Rivers and Landscapes Team"
+date: "`r gsub(' 0([1-9])', ' \\1', format(Sys.Date(), '%B %d, %Y'))`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+<style>
+/* section header spacing */
+h1, h2, h3, h4 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+/* figure spacing */
+img {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+</style>
+
+
+
+# Setup
+
+```{r set_up}
+# set markdown chunk options
+knitr::opts_chunk$set(fig.align = "center")
+knitr::opts_chunk$set(out.width = "70%")
+
+# load ggplot2; only package I don't like calling functions from explictly  
+# because plotting code gets way too crowded
+library(ggplot2)
+
+# establish colors
+white <- "#ffffff"
+light_grey <- "#f7f7f7"
+mid_grey <- "#d3d3d3"
+dark_grey <- "#898989"
+black <- "#000000"
+
+ggplot_cat_colors <- scale_colour_hue()$palette(3)
+ggplot_cat_colors_light <- colorspace::lighten(ggplot_cat_colors, amount = 0.3)
+ggplot_cat_colors_dark <- colorspace::darken(ggplot_cat_colors, amount = 0.3)
+```
+
+
+
+# Feather River flow data
+
+## Data pull and cleaning
+
+```{r create_feather_flows}
+# create a function to pull and clean CDEC streamgage data
+get_clean_cdec_flow <- function(station,
+                                sensor,
+                                dur_code,
+                                start_date,
+                                end_date) {
+  
+  flow <- CDECRetrieve::cdec_query(
+    station = station,
+    sensor = sensor,
+    dur_code = dur_code,
+    start_date = start_date,
+    end_date = end_date
+  )
+  
+  flow <- flow[!is.na(flow$datetime), ]
+  flow <- flow[!is.na(flow$parameter_value), ]
+  
+  flow$datetime <- lubridate::as_date(flow$datetime)
+  
+  year_part <- lubridate::year(flow$datetime) - (lubridate::month(flow$datetime) < 10)
+  flow$water_year <- paste(year_part, year_part + 1, sep = "-")
+  
+  flow$station_water_year <- paste(flow$location_id, flow$water_year, sep = "_")
+  
+  flow$water_year_start <- as.Date(paste0(year_part, "-10-01"))
+  
+  flow$water_year_day <- as.integer(flow$datetime - flow$water_year_start + 1)
+  
+  return(flow)
+}
+
+# specify start and end dates; two of the stations don't have data before 2021,
+# so going with a time period where all stations have essentially complete data
+start_date <- "2021-10-01"
+end_date <- "2024-09-30"
+
+# pull CDEC data for gages on the Feather River
+tfb_flows <- get_clean_cdec_flow(
+  station = "TFB",
+  sensor = 41, # daily discharge (CFS)
+  dur_code = "D", # daily timestep
+  start_date = start_date,
+  end_date = end_date
+)
+
+grl_flows <- get_clean_cdec_flow(
+  station = "GRL",
+  sensor = 41, # daily discharge (CFS)
+  dur_code = "D", # daily timestep
+  start_date = start_date,
+  end_date = end_date
+)
+
+fsb_flows <- get_clean_cdec_flow(
+  station = "FSB",
+  sensor = 20, # hourly discharge (CFS) - daily isn't available
+  dur_code = "H", # hourly timestep
+  start_date = start_date,
+  end_date = end_date
+)
+
+# convert FSB hourly data to daily means
+fsb_flows <- fsb_flows |>
+  dplyr::group_by(datetime) |>
+  dplyr::mutate(parameter_value = mean(parameter_value, na.rm = TRUE)) |>
+  dplyr::ungroup() |>
+  unique()
+
+# create a single flows object
+flows <- rbind(tfb_flows, grl_flows, fsb_flows)
+
+# add an exceedance attribute
+flows <- flows |>
+  dplyr::group_by(location_id) |>
+  dplyr::mutate(exceedance = 1 - (rank(parameter_value, ties.method = "average") / (dplyr::n() + 1))) |>
+  dplyr::ungroup()
+```
+
+
+
+## Visualizations
+
+```{r view_feather_hydrographs, echo = FALSE, out.width = "100%"}
+# create a factor to intelligibly label facets
+flows$facet_label <- factor(
+  flows$location_id,
+  levels = c("TFB", "GRL", "FSB"),
+  labels = c("Thermalito Fish Barrier", "Gridley", "Star Bend"),
+)
+
+# plot hydrographs
+ggplot(
+  data = flows,
+  aes(
+    x = water_year_day,
+    y = parameter_value,
+    color = as.factor(water_year),
+    group = water_year
+  )) +
+  annotate(
+    "rect",
+    xmin = 93, xmax = 274,
+    ymin = -Inf, ymax = Inf,
+    fill = mid_grey,
+    alpha = 0.5
+  ) +
+  geom_line() +
+  facet_wrap(~ facet_label) +
+  scale_x_continuous(
+    breaks = c(1, 32, 62, 93, 124, 152, 183, 213, 244, 274, 305, 336),
+    labels = c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep"),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    labels = scales::comma,
+    breaks = seq(from = 0, to = 50000, by = 5000),
+    expand = c(0, 0)
+  ) +
+  labs(
+    y = "dischage (cfs)",
+    color = "water year"
+  ) +
+  guides(color = guide_legend(label.hjust = 0.5)) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "bottom",
+    legend.title.position = "top",
+    legend.title = element_text(hjust = 0.5),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y = element_text(margin = margin(r = 10))
+  )
+```
+
+```{r view_feather_boxplots, echo = FALSE}
+# plot boxplots of discharge at each site
+ggplot(data = flows, aes(x = facet_label, y = parameter_value)) +
+  geom_boxplot() +
+  scale_y_continuous(
+    labels = scales::comma,
+    breaks = seq(from = 0, to = 50000, by = 5000)) +
+  labs(
+    x = NULL,
+    y = "discharge (cfs)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.line.x = element_line(color = dark_grey),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+```{r view_feather_exceedance}
+# plot exceedance probabilities; data are log-transformed for better 
+# visualization but y-axis labels are back-transformed for easy interpretation
+ggplot(
+    data = flows,
+    aes(x = exceedance, y = parameter_value, color = facet_label)
+  ) +
+  geom_line() +
+  scale_x_continuous(
+    labels = scales::percent,
+    breaks = seq(0, 1, by = 0.1),
+    limits = c(0, 1)
+  ) +
+  scale_y_continuous(
+    labels = scales::comma,
+    trans = "log10",
+    breaks = c(1000, 2000, 5000, 10000, 20000, 50000)
+  ) +
+  labs(
+    x = "percent exceedance",
+    y = "discharge (cfs)",
+    color = "location"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+
+
+# Feather River flow-habitat curves
+
+## Data pull
+
+```{r import_sbrs_from_edi}
+package_id <- "edi.1511.1"
+
+entity_names <- EDIutils::read_data_entity_names(packageId = package_id)
+entity_names$entityName <- snakecase::to_any_case(
+  entity_names$entityName,
+  case = "snake"
+)
+
+for (i in seq_len(nrow(entity_names))) {
+  entity_id <- entity_names$entityId[i]
+  entity_name <- entity_names$entityName[i]
+  
+  data_entity <- EDIutils::read_data_entity(
+    packageId = package_id,
+    entityId = entity_id
+  )
+  
+  data_read <- readr::read_csv(file = data_entity)
+  
+  assign(x = entity_name, value = data_read)
+}
+
+feather_hab_flow_addl <- dplyr::filter(
+  habitat_flow_relationships,
+  watershed == "Feather River",
+  scenario == "VA additional acres",
+  habitat_type == "Instream rearing"
+)
+
+feather_hab_flow_addl <- dplyr::select(
+  feather_hab_flow_addl,
+  flow_cfs,
+  habitat_area_acres
+)
+```
+
+
+
+## Interpolation set up
+
+### Parameters
+
+```{r specify_interp_parameters}
+# specify a margin of error; selecting 5% as prescribed by draft POI
+moe_prop <- 0.05
+```
+
+### Functions
+
+```{r specify_interp_functions}
+# create a function that interpolates between two coordinate pairs with a sine curve
+interpolate_sine <- function(x_start, x_end, y_start, y_end, n) {
+  # generate n equally spaced x values between x_start and x_end
+  x_values <- seq(x_start, x_end, length.out = n)
+  
+  # calculate the amplitude and vertical shift based on y_start and y_end
+  amplitude <- (y_end - y_start) / 2
+  y_center <- (y_start + y_end) / 2
+  
+  # scale x values to cover a half sine wave, ensuring it goes from -1 to 1
+  y_values <- y_center + amplitude * sin((x_values - x_start) * (pi / (x_end - x_start)) - (pi / 2))
+  
+  # return a dataframe of x and y coordinates
+  return(data.frame(x = x_values, y = y_values))
+}
+
+# create a function that interpolates between two coordinate pairs with an ellipse arc
+interpolate_ellipse <- function(x_start,
+                                x_end, y_start,
+                                y_end, n,
+                                quadrant = "ur") {
+  # set theta range and center based on the selected quadrant (upper-right,
+  # upper-left, bottom-right, or bottom-left)
+  if (quadrant == "ur") {
+    theta <- seq(0, pi / 2, length.out = n)
+    x_center <- min(x_start, x_end)
+    y_center <- min(y_start, y_end)
+  } else if (quadrant == "ul") {
+    theta <- seq(pi / 2, pi, length.out = n)
+    x_center <- max(x_start, x_end)
+    y_center <- min(y_start, y_end)
+  } else if (quadrant == "br") {
+    theta <- seq(-pi / 2, 0, length.out = n)
+    x_center <- min(x_start, x_end)
+    y_center <- max(y_start, y_end)
+  } else if (quadrant == "bl") {
+    theta <- seq(pi, 3 * pi / 2, length.out = n)
+    x_center <- max(x_start, x_end)
+    y_center <- max(y_start, y_end)
+  } else {
+    stop("invalid quadrant, choose from 'ul', 'ur', 'br', or 'bl'")
+  }
+  
+  # calculate the semi-major and semi-minor axes
+  semi_major_axis <- abs(x_end - x_start)
+  semi_minor_axis <- abs(y_end - y_start)
+  
+  # calculate x and y coordinates along the elliptical arc
+  x_values <- x_center + semi_major_axis * cos(theta)
+  y_values <- y_center + semi_minor_axis * sin(theta)
+  
+  # return a dataframe of x and y coordinates
+  return(data.frame(x = x_values, y = y_values))
+}
+```
+
+
+
+## Linear interpolation
+
+```{r create_linear_interp}
+# add margin of error columns
+feather_hab_flow_addl <- dplyr::mutate(
+  feather_hab_flow_addl,
+  habitat_area_acres_lower = (1 - moe_prop) * habitat_area_acres,
+  habitat_area_acres_upper = (1 + moe_prop) * habitat_area_acres
+)
+
+# visualize the linear interpolation with a 5% margin of error
+ggplot(
+    data = feather_hab_flow_addl,
+    aes(x = flow_cfs, y = habitat_area_acres)
+  ) +
+  geom_ribbon(
+    aes(ymin = habitat_area_acres_lower, ymax = habitat_area_acres_upper),
+    fill = mid_grey,
+    alpha = 0.5
+  ) +
+  geom_line(color = black, size = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(
+    limits = c(600, 3200),
+    labels = scales::comma,
+    breaks = seq(from = 600, to = 3200, by = 400),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(breaks = seq(from = 2, to = 6, by = 0.5)) +
+  labs(
+    title = "Linear interpolation",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(margin = margin(b = 20)),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+
+
+## Cubic spline interpolation (unanchored)
+
+I don't think this is particularly helpful but still making it as a wild edge
+case since this is mathematically a defensible mechanism for interpolation.
+
+```{r create_cubic_spline_interp}
+# create the cubic spline curve values
+cubic_spline <- as.data.frame(stats::spline(
+  x = feather_hab_flow_addl$flow_cfs,
+  y = feather_hab_flow_addl$habitat_area_acres,
+  n = 1000
+))
+
+colnames(cubic_spline) <- c("flow_cfs", "habitat_area_acres")
+
+cubic_spline <- dplyr::mutate(
+  cubic_spline,
+  habitat_area_acres_lower = habitat_area_acres * (1 - moe_prop),
+  habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
+)
+
+# visualize the cubic spline interpolation with a 5% margin of error
+ggplot() +
+  geom_ribbon(
+    data = cubic_spline,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = mid_grey,
+    alpha = 0.5
+  ) +
+  geom_line(
+    data = cubic_spline,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 1
+  ) +
+  geom_point(
+    data = feather_hab_flow_addl,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    size = 2
+  ) +
+  scale_x_continuous(
+    limits = c(600, 3200),
+    labels = scales::comma,
+    breaks = seq(from = 600, to = 3200, by = 400),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Cubic spline interpolation (unanchored)",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(margin = margin(b = 20)),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+
+
+## Cubic spline interpolation (anchored)
+
+```{r create_cubic_spline_interp_anchored}
+# add slightly arbitrary anchor points between the second pair of coordinates
+anchor_rows <- tibble::tribble(
+  ~flow_cfs, ~habitat_area_acres, ~habitat_area_acres_lower, ~habitat_area_acres_upper,
+  800,       4.9,                 5 * (1 - moe_prop),        5 * (1 + moe_prop),
+  1030,      5.0,                 5 * (1 - moe_prop),        5 * (1 + moe_prop),
+  1400,      4.75,                5 * (1 - moe_prop),        5 * (1 + moe_prop)
+)
+
+feather_hab_flow_addl_anchored <- dplyr::bind_rows(
+  feather_hab_flow_addl,
+  anchor_rows
+)
+
+# create the anchored ubic spline curve values
+cubic_spline_anchored <- as.data.frame(stats::spline(
+  x = feather_hab_flow_addl_anchored$flow_cfs,
+  y = feather_hab_flow_addl_anchored$habitat_area_acres,
+  n = 1000
+))
+
+colnames(cubic_spline_anchored) <- c("flow_cfs", "habitat_area_acres")
+
+cubic_spline_anchored <- dplyr::mutate(
+  cubic_spline_anchored,
+  habitat_area_acres_lower = habitat_area_acres * (1 - moe_prop),
+  habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
+)
+
+# visualize the cubic spline interpolation with a 5% margin of error
+ggplot() +
+  geom_ribbon(
+    data = cubic_spline_anchored,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[1],
+    alpha = 0.5
+  ) +
+  geom_line(
+    data = cubic_spline_anchored,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[1],
+    size = 1
+  ) +
+  geom_point(
+    data = feather_hab_flow_addl,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    size = 2
+  ) +
+  scale_x_continuous(
+    limits = c(600, 3200),
+    labels = scales::comma,
+    breaks = seq(from = 600, to = 3200, by = 400),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Cubic spline interpolation (anchored)",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(margin = margin(b = 20)),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+
+
+# Sine interpolation
+
+```{r create_sine_interp}
+# create a half-cycle sine interpolation between first two coordinate pairs
+first_sine_interp <- interpolate_sine(
+  x_start = as.numeric(feather_hab_flow_addl[1, "flow_cfs"]),
+  x_end   = as.numeric(feather_hab_flow_addl[2, "flow_cfs"]),
+  y_start = as.numeric(feather_hab_flow_addl[1, "habitat_area_acres"]),
+  y_end   = as.numeric(feather_hab_flow_addl[2, "habitat_area_acres"]), 
+  n = 100
+)
+
+# create a half-cycle sine interpolation between second two coordinate pairs
+second_sine_interp <- interpolate_sine(
+  x_start = as.numeric(feather_hab_flow_addl[2, "flow_cfs"]),
+  x_end   = as.numeric(feather_hab_flow_addl[3, "flow_cfs"]),
+  y_start = as.numeric(feather_hab_flow_addl[2, "habitat_area_acres"]),
+  y_end   = as.numeric(feather_hab_flow_addl[3, "habitat_area_acres"]), 
+  n = 100
+)
+
+# combine into a single sine interpolation
+sine_interp <- rbind(first_sine_interp, second_sine_interp)
+colnames(sine_interp) <- c("flow_cfs", "habitat_area_acres")
+
+sine_interp <- dplyr::mutate(
+  sine_interp,
+  habitat_area_acres_lower = habitat_area_acres * (1 - moe_prop),
+  habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
+)
+
+# visualize the half-cycle sine interpolation with a 5% margin of error
+ggplot() +
+  geom_ribbon(
+    data = sine_interp,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[2],
+    alpha = 0.5
+  ) +
+  geom_line(
+    data = sine_interp,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[2],
+    size = 1
+  ) +
+  geom_point(
+    data = feather_hab_flow_addl,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    size = 2
+  ) +
+  scale_x_continuous(
+    limits = c(600, 3200),
+    labels = scales::comma,
+    breaks = seq(from = 600, to = 3200, by = 400),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Half-cycle sine interpolation",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(margin = margin(b = 20)),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+
+
+# Ellipse interpolation
+
+```{r}
+# create an elliptical arc between the first two coordinate pairs
+first_ellipse_interp <- interpolate_ellipse(
+  x_start = as.numeric(feather_hab_flow_addl[1, "flow_cfs"]),
+  x_end   = as.numeric(feather_hab_flow_addl[2, "flow_cfs"]),
+  y_start = as.numeric(feather_hab_flow_addl[1, "habitat_area_acres"]),
+  y_end   = as.numeric(feather_hab_flow_addl[2, "habitat_area_acres"]), 
+  n = 100,
+  quadrant = "ul"
+)
+
+# create an elliptical arc between the second two coordinate pairs
+second_ellipse_interp <- interpolate_ellipse(
+  x_start = as.numeric(feather_hab_flow_addl[2, "flow_cfs"]),
+  x_end   = as.numeric(feather_hab_flow_addl[3, "flow_cfs"]),
+  y_start = as.numeric(feather_hab_flow_addl[2, "habitat_area_acres"]),
+  y_end   = as.numeric(feather_hab_flow_addl[3, "habitat_area_acres"]), 
+  n = 100,
+  quadrant = "ur"
+)
+
+# combine into a single elliptical arc interpolation
+ellipse_interp <- rbind(first_ellipse_interp, second_ellipse_interp)
+colnames(ellipse_interp) <- c("flow_cfs", "habitat_area_acres")
+
+ellipse_interp <- dplyr::mutate(
+  ellipse_interp,
+  habitat_area_acres_lower = habitat_area_acres * (1 - moe_prop),
+  habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
+)
+
+# visualize the elliptical arc interpolation with a 5% margin of error
+ggplot() +
+  geom_ribbon(
+    data = ellipse_interp,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[3],
+    alpha = 0.5
+  ) +
+  geom_line(
+    data = ellipse_interp,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[3],
+    size = 1
+  ) +
+  geom_point(
+    data = feather_hab_flow_addl,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    size = 2
+  ) +
+  scale_x_continuous(
+    limits = c(600, 3200),
+    labels = scales::comma,
+    breaks = seq(from = 600, to = 3200, by = 400),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Ellipse interpolation",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(margin = margin(b = 20)),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+```{r visualize_all_interp}
+ggplot() +
+  geom_ribbon(
+    data = feather_hab_flow_addl,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = dark_grey,
+    alpha = 0.5
+  ) +
+  geom_line(
+    data = feather_hab_flow_addl,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 1
+  ) +
+  geom_ribbon(
+    data = cubic_spline_anchored,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[1],
+    alpha = 0.5
+  ) +
+  geom_line(
+    data = cubic_spline_anchored,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[1],
+    size = 1
+  ) +
+  geom_ribbon(
+    data = sine_interp,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[2],
+    alpha = 0.5
+  ) +
+  geom_line(
+    data = sine_interp,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[2],
+    size = 1
+  ) +
+    geom_ribbon(
+    data = ellipse_interp,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[3],
+    alpha = 0.5
+  ) +
+  geom_line(
+    data = ellipse_interp,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[3],
+    size = 1
+  ) +
+  geom_point(
+    data = feather_hab_flow_addl,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 3
+  ) +
+  scale_x_continuous(
+    limits = c(600, 3200),
+    labels = scales::comma,
+    breaks = seq(from = 600, to = 3200, by = 400),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Interpolation methods",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(margin = margin(b = 20)),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+
+
+##
+
+```{r}
+```
