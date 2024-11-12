@@ -26,9 +26,12 @@ img {
 knitr::opts_chunk$set(fig.align = "center")
 knitr::opts_chunk$set(out.width = "70%")
 
+library(ggplot2)
+
 white <- "#ffffff"
 light_grey <- "#f7f7f7"
 mid_grey <- "#d3d3d3"
+dark_grey <- "#898989"
 ```
 
 
@@ -108,7 +111,7 @@ restoration site design, habitat accounting and consistency assessments.
 
 
 
-## Documents
+# Documents
 
 There are three documents that address habitat accounting under the Voluntary 
 Agreements:
@@ -130,7 +133,7 @@ SWRCB staff
 
 
 
-# SWRCB Scientific Basis Report Supplement
+## SWRCB Scientific Basis Report Supplement
 
 In the Final Scientific Basis Report Supplement, SWRCB staff authors detail an 
 approach for estimating and tracking suitable habitat areas for salmonid 
@@ -330,3 +333,172 @@ assumed flow-habitat relationship.
 2. Compare this constructed flow-habitat relationship to the assumed 
 flow-habitat relationships
 
+### PICK UP HERE ###
+
+
+
+# Flow data for the Feather River
+
+```{r create_feather_flows, echo = FALSE}
+# create a function to pull and clean CDEC data
+get_clean_cdec_flow <- function(station, sensor, dur_code, start_date, end_date) {
+  flow <- CDECRetrieve::cdec_query(
+    station = station,
+    sensor = sensor,
+    dur_code = dur_code,
+    start_date = start_date,
+    end_date = end_date
+  )
+  
+  flow <- flow[!is.na(flow$datetime), ]
+  flow <- flow[!is.na(flow$parameter_value), ]
+  
+  flow$datetime <- lubridate::as_date(flow$datetime)
+  
+  year_part <- lubridate::year(flow$datetime) - (lubridate::month(flow$datetime) < 10)
+  flow$water_year <- paste(year_part, year_part + 1, sep = "-")
+  
+  flow$station_water_year <- paste(flow$location_id, flow$water_year, sep = "_")
+  
+  flow$water_year_start <- as.Date(paste0(year_part, "-10-01"))
+  
+  flow$water_year_day <- as.integer(flow$datetime - flow$water_year_start + 1)
+  
+  return(flow)
+}
+
+# specify start and end dates; some stations don't have data before 2021
+start_date <- "2021-10-01"
+end_date <- "2024-09-30"
+
+# pull CDEC data for gages on the Feather River
+tfb_flows <- get_clean_cdec_flow(
+  station = "TFB",
+  sensor = 41, # daily discharge (CFS)
+  dur_code = "D", # daily timestep
+  start_date = start_date,
+  end_date = end_date
+)
+
+grl_flows <- get_clean_cdec_flow(
+  station = "GRL",
+  sensor = 41, # daily discharge (CFS)
+  dur_code = "D", # daily timestep
+  start_date = start_date,
+  end_date = end_date
+)
+
+fsb_flows <- get_clean_cdec_flow(
+  station = "FSB",
+  sensor = 20, # hourly discharge (CFS) - daily isn't available
+  dur_code = "H", # hourly timestep
+  start_date = start_date,
+  end_date = end_date
+)
+
+# clean data
+fsb_flows <- fsb_flows |>
+  dplyr::group_by(datetime) |>
+  dplyr::mutate(parameter_value = mean(parameter_value, na.rm = TRUE)) |>
+  dplyr::ungroup() |>
+  unique()
+
+flows <- rbind(tfb_flows, grl_flows, fsb_flows)
+
+flows <- flows |>
+  dplyr::group_by(location_id) |>
+  dplyr::mutate(exceedance = 1 - (rank(parameter_value, ties.method = "average") / (dplyr::n() + 1))) |>
+  dplyr::ungroup()
+```
+
+```{r view_feather_hydrographs, echo = FALSE, out.width = "100%"}
+flows$facet_label <- factor(
+  flows$location_id,
+  levels = c("TFB", "GRL", "FSB"),
+  labels = c("Thermalito Fish Barrier", "Gridley", "Star Bend"),
+)
+
+ggplot(flows, aes(
+    x = water_year_day,
+    y = parameter_value,
+    color = as.factor(water_year),
+    group = water_year
+  )) +
+  annotate(
+    "rect",
+    xmin = 93, xmax = 244,
+    ymin = -Inf, ymax = Inf,
+    fill = mid_grey,
+    alpha = 0.5
+  ) +
+  geom_line() +
+  facet_wrap(~ facet_label) +
+  scale_x_continuous(
+    breaks = c(1, 32, 62, 93, 124, 152, 183, 213, 244, 274, 305, 336),
+    labels = c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep"),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    labels = scales::comma,
+    breaks = seq(from = 0, to = 50000, by = 5000),
+    expand = c(0, 0)
+  ) +
+  labs(
+    y = "dischage (cfs)",
+    color = "water year"
+  ) +
+  guides(color = guide_legend(label.hjust = 0.5)) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "bottom",
+    legend.title.position = "top",
+    legend.title = element_text(hjust = 0.5),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.y = element_text(margin = margin(r = 10))
+  )
+```
+
+```{r view_feather_boxplots, echo = FALSe}
+ggplot(flows, aes(x = facet_label, y = parameter_value)) +
+  geom_boxplot() +
+  scale_y_continuous(
+    labels = scales::comma,
+    breaks = seq(from = 0, to = 50000, by = 5000)) +
+  labs(
+    x = NULL,
+    y = "discharge (cfs)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
+
+```{r}
+ggplot(flows, aes(x = exceedance, y = parameter_value, color = facet_label)) +
+  geom_line() +
+  scale_x_continuous(
+    labels = scales::percent,
+    breaks = seq(0, 1, by = 0.1),
+    limits = c(0, 1)
+  ) +
+  scale_y_continuous(
+    labels = scales::comma,
+    trans = "log10",
+    breaks = c(1000, 2000, 5000, 10000, 20000, 50000)
+  ) +
+  labs(
+    x = "percent exceedance",
+    y = "discharge (cfs)",
+    color = "location"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+```
