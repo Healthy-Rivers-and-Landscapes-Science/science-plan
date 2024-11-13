@@ -1,9 +1,10 @@
 ---
-title: "Flow-Habitat Area Curves"
-author: "Department of Water Resources Healthy Rivers and Landscapes Team"
+title: "Flow-Habitat Area Curves: Feather River Example"
+author: "DWR Healthy Rivers and Landscapes Team"
 date: "`r gsub(' 0([1-9])', ' \\1', format(Sys.Date(), '%B %d, %Y'))`"
 output:
   html_document:
+    highlight: tango
     toc: true
     toc_depth: 2
 ---
@@ -11,14 +12,14 @@ output:
 <style>
 /* section header spacing */
 h1, h2, h3, h4 {
-  margin-top: 1.5em;
+  margin-top: 1em;
   margin-bottom: 0.5em;
 }
 
 /* figure spacing */
 img {
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
+  margin-top: 5em;
+  margin-bottom: 2em;
 }
 </style>
 
@@ -31,18 +32,18 @@ img {
 knitr::opts_chunk$set(fig.align = "center")
 knitr::opts_chunk$set(out.width = "70%")
 
-# load ggplot2; only package I don't like calling functions from explictly  
+# load ggplot2; only package I don't like calling functions from explicitly  
 # because plotting code gets way too crowded
 library(ggplot2)
 
 # establish colors
-white <- "#ffffff"
+white      <- "#ffffff"
 light_grey <- "#f7f7f7"
-mid_grey <- "#d3d3d3"
-dark_grey <- "#898989"
-black <- "#000000"
+mid_grey   <- "#d3d3d3"
+dark_grey  <- "#898989"
+black      <- "#000000"
 
-ggplot_cat_colors <- scale_colour_hue()$palette(3)
+ggplot_cat_colors <- scale_colour_hue()$palette(5)
 ggplot_cat_colors_light <- colorspace::lighten(ggplot_cat_colors, amount = 0.3)
 ggplot_cat_colors_dark <- colorspace::darken(ggplot_cat_colors, amount = 0.3)
 ```
@@ -137,7 +138,7 @@ flows <- flows |>
 
 ## Visualizations
 
-```{r view_feather_hydrographs, echo = FALSE, out.width = "100%"}
+```{r view_feather_hydrographs, out.width = "90%"}
 # create a factor to intelligibly label facets
 flows$facet_label <- factor(
   flows$location_id,
@@ -159,7 +160,7 @@ ggplot(
     xmin = 93, xmax = 274,
     ymin = -Inf, ymax = Inf,
     fill = mid_grey,
-    alpha = 0.5
+    alpha = 0.45
   ) +
   geom_line() +
   facet_wrap(~ facet_label) +
@@ -192,32 +193,39 @@ ggplot(
   )
 ```
 
-```{r view_feather_boxplots, echo = FALSE}
+```{r view_feather_boxplots, out.height = "150%"}
 # plot boxplots of discharge at each site
-ggplot(data = flows, aes(x = facet_label, y = parameter_value)) +
-  geom_boxplot() +
+ggplot() +
+  geom_boxplot(
+    data = flows,
+    aes(x = facet_label, y = parameter_value, color = facet_label),
+    fill = mid_grey
+  ) +
   scale_y_continuous(
     labels = scales::comma,
     breaks = seq(from = 0, to = 50000, by = 5000)) +
   labs(
     x = NULL,
-    y = "discharge (cfs)"
+    y = "discharge (cfs)",
+    color = "streamgage site"
   ) +
   theme_minimal() +
   theme(
     axis.line.x = element_line(color = dark_grey),
-    axis.title.y = element_text(margin = margin(r = 20))
+    axis.title.y = element_text(margin = margin(r = 20)),
+    axis.text.x = element_text(margin = margin(t = 10))
   )
 ```
 
 ```{r view_feather_exceedance}
 # plot exceedance probabilities; data are log-transformed for better 
 # visualization but y-axis labels are back-transformed for easy interpretation
-ggplot(
+ggplot() +
+  geom_line(
     data = flows,
-    aes(x = exceedance, y = parameter_value, color = facet_label)
+    aes(x = exceedance, y = parameter_value, color = facet_label),
+    linewidth = 1
   ) +
-  geom_line() +
   scale_x_continuous(
     labels = scales::percent,
     breaks = seq(0, 1, by = 0.1),
@@ -231,7 +239,7 @@ ggplot(
   labs(
     x = "percent exceedance",
     y = "discharge (cfs)",
-    color = "location"
+    color = "streamgage site"
   ) +
   theme_minimal() +
   theme(
@@ -247,15 +255,19 @@ ggplot(
 
 ## Data pull
 
-```{r import_sbrs_from_edi}
+```{r import_sbrs_from_edi, message = FALSE}
+# specify the EDI package unique identifier
 package_id <- "edi.1511.1"
 
+# grab entity names and convert to snakecase for later name assignment
 entity_names <- EDIutils::read_data_entity_names(packageId = package_id)
 entity_names$entityName <- snakecase::to_any_case(
   entity_names$entityName,
   case = "snake"
 )
 
+# import all entities associated with EDI package and assign to names (in case
+# we are curious about these objects later)
 for (i in seq_len(nrow(entity_names))) {
   entity_id <- entity_names$entityId[i]
   entity_name <- entity_names$entityName[i]
@@ -270,6 +282,7 @@ for (i in seq_len(nrow(entity_names))) {
   assign(x = entity_name, value = data_read)
 }
 
+# filter to retain Feather River data
 feather_hab_flow_addl <- dplyr::filter(
   habitat_flow_relationships,
   watershed == "Feather River",
@@ -277,6 +290,7 @@ feather_hab_flow_addl <- dplyr::filter(
   habitat_type == "Instream rearing"
 )
 
+# retain only necessary information for ease of analysis
 feather_hab_flow_addl <- dplyr::select(
   feather_hab_flow_addl,
   flow_cfs,
@@ -286,16 +300,16 @@ feather_hab_flow_addl <- dplyr::select(
 
 
 
-## Interpolation set up
-
-### Parameters
+## Parameters
 
 ```{r specify_interp_parameters}
 # specify a margin of error; selecting 5% as prescribed by draft POI
 moe_prop <- 0.05
 ```
 
-### Functions
+
+
+## Functions
 
 ```{r specify_interp_functions}
 # create a function that interpolates between two coordinate pairs with a sine curve
@@ -362,9 +376,11 @@ interpolate_ellipse <- function(x_start,
 # add margin of error columns
 feather_hab_flow_addl <- dplyr::mutate(
   feather_hab_flow_addl,
-  habitat_area_acres_lower = (1 - moe_prop) * habitat_area_acres,
-  habitat_area_acres_upper = (1 + moe_prop) * habitat_area_acres
+  habitat_area_acres_lower = habitat_area_acres * (1 - moe_prop),
+  habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
 )
+
+feather_hab_flow_addl <- dplyr::arrange(feather_hab_flow_addl, flow_cfs)
 
 # visualize the linear interpolation with a 5% margin of error
 ggplot(
@@ -373,10 +389,10 @@ ggplot(
   ) +
   geom_ribbon(
     aes(ymin = habitat_area_acres_lower, ymax = habitat_area_acres_upper),
-    fill = mid_grey,
-    alpha = 0.5
+    fill = ggplot_cat_colors_light[1],
+    alpha = 0.45
   ) +
-  geom_line(color = black, size = 1) +
+  geom_line(color = ggplot_cat_colors_dark[1], linewidth = 1) +
   geom_point(size = 2) +
   scale_x_continuous(
     limits = c(600, 3200),
@@ -393,6 +409,7 @@ ggplot(
   theme_minimal() +
   theme(
     plot.title = element_text(margin = margin(b = 20)),
+    axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(margin = margin(t = 20)),
     axis.title.y = element_text(margin = margin(r = 20))
   )
@@ -421,6 +438,8 @@ cubic_spline <- dplyr::mutate(
   habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
 )
 
+cubic_spline <- dplyr::arrange(cubic_spline, flow_cfs)
+
 # visualize the cubic spline interpolation with a 5% margin of error
 ggplot() +
   geom_ribbon(
@@ -431,13 +450,13 @@ ggplot() +
       ymax = habitat_area_acres_upper
     ),
     fill = mid_grey,
-    alpha = 0.5
+    alpha = 0.45
   ) +
   geom_line(
     data = cubic_spline,
     aes(x = flow_cfs, y = habitat_area_acres),
     color = black,
-    size = 1
+    linewidth = 1
   ) +
   geom_point(
     data = feather_hab_flow_addl,
@@ -458,6 +477,7 @@ ggplot() +
   theme_minimal() +
   theme(
     plot.title = element_text(margin = margin(b = 20)),
+    axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(margin = margin(t = 20)),
     axis.title.y = element_text(margin = margin(r = 20))
   )
@@ -481,7 +501,7 @@ feather_hab_flow_addl_anchored <- dplyr::bind_rows(
   anchor_rows
 )
 
-# create the anchored ubic spline curve values
+# create the anchored cubic spline curve values
 cubic_spline_anchored <- as.data.frame(stats::spline(
   x = feather_hab_flow_addl_anchored$flow_cfs,
   y = feather_hab_flow_addl_anchored$habitat_area_acres,
@@ -496,6 +516,8 @@ cubic_spline_anchored <- dplyr::mutate(
   habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
 )
 
+cubic_spline_anchored <- dplyr::arrange(cubic_spline_anchored, flow_cfs)
+
 # visualize the cubic spline interpolation with a 5% margin of error
 ggplot() +
   geom_ribbon(
@@ -505,14 +527,14 @@ ggplot() +
       ymin = habitat_area_acres_lower,
       ymax = habitat_area_acres_upper
     ),
-    fill = ggplot_cat_colors_light[1],
-    alpha = 0.5
+    fill = ggplot_cat_colors_light[2],
+    alpha = 0.45
   ) +
   geom_line(
     data = cubic_spline_anchored,
     aes(x = flow_cfs, y = habitat_area_acres),
-    color = ggplot_cat_colors_dark[1],
-    size = 1
+    color = ggplot_cat_colors_dark[2],
+    linewidth = 1
   ) +
   geom_point(
     data = feather_hab_flow_addl,
@@ -533,6 +555,7 @@ ggplot() +
   theme_minimal() +
   theme(
     plot.title = element_text(margin = margin(b = 20)),
+    axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(margin = margin(t = 20)),
     axis.title.y = element_text(margin = margin(r = 20))
   )
@@ -540,7 +563,7 @@ ggplot() +
 
 
 
-# Sine interpolation
+## Sine interpolation
 
 ```{r create_sine_interp}
 # create a half-cycle sine interpolation between first two coordinate pairs
@@ -558,7 +581,7 @@ second_sine_interp <- interpolate_sine(
   x_end   = as.numeric(feather_hab_flow_addl[3, "flow_cfs"]),
   y_start = as.numeric(feather_hab_flow_addl[2, "habitat_area_acres"]),
   y_end   = as.numeric(feather_hab_flow_addl[3, "habitat_area_acres"]), 
-  n = 100
+  n = 900
 )
 
 # combine into a single sine interpolation
@@ -571,6 +594,8 @@ sine_interp <- dplyr::mutate(
   habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
 )
 
+sine_interp <- dplyr::arrange(sine_interp, flow_cfs)
+
 # visualize the half-cycle sine interpolation with a 5% margin of error
 ggplot() +
   geom_ribbon(
@@ -580,14 +605,14 @@ ggplot() +
       ymin = habitat_area_acres_lower,
       ymax = habitat_area_acres_upper
     ),
-    fill = ggplot_cat_colors_light[2],
-    alpha = 0.5
+    fill = ggplot_cat_colors_light[3],
+    alpha = 0.45
   ) +
   geom_line(
     data = sine_interp,
     aes(x = flow_cfs, y = habitat_area_acres),
-    color = ggplot_cat_colors_dark[2],
-    size = 1
+    color = ggplot_cat_colors_dark[3],
+    linewidth = 1
   ) +
   geom_point(
     data = feather_hab_flow_addl,
@@ -608,6 +633,7 @@ ggplot() +
   theme_minimal() +
   theme(
     plot.title = element_text(margin = margin(b = 20)),
+    axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(margin = margin(t = 20)),
     axis.title.y = element_text(margin = margin(r = 20))
   )
@@ -615,9 +641,9 @@ ggplot() +
 
 
 
-# Ellipse interpolation
+## Ellipse interpolation (convex)
 
-```{r}
+```{r create}
 # create an elliptical arc between the first two coordinate pairs
 first_ellipse_interp <- interpolate_ellipse(
   x_start = as.numeric(feather_hab_flow_addl[1, "flow_cfs"]),
@@ -628,43 +654,49 @@ first_ellipse_interp <- interpolate_ellipse(
   quadrant = "ul"
 )
 
-# create an elliptical arc between the second two coordinate pairs
-second_ellipse_interp <- interpolate_ellipse(
+# create a convex elliptical arc between the second two coordinate pairs
+second_ellipse_convex_interp <- interpolate_ellipse(
   x_start = as.numeric(feather_hab_flow_addl[2, "flow_cfs"]),
   x_end   = as.numeric(feather_hab_flow_addl[3, "flow_cfs"]),
   y_start = as.numeric(feather_hab_flow_addl[2, "habitat_area_acres"]),
   y_end   = as.numeric(feather_hab_flow_addl[3, "habitat_area_acres"]), 
-  n = 100,
+  n = 900,
   quadrant = "ur"
 )
 
 # combine into a single elliptical arc interpolation
-ellipse_interp <- rbind(first_ellipse_interp, second_ellipse_interp)
-colnames(ellipse_interp) <- c("flow_cfs", "habitat_area_acres")
+ellipse_convex_interp <- rbind(
+  first_ellipse_interp,
+  second_ellipse_convex_interp
+)
 
-ellipse_interp <- dplyr::mutate(
-  ellipse_interp,
+colnames(ellipse_convex_interp) <- c("flow_cfs", "habitat_area_acres")
+
+ellipse_convex_interp <- dplyr::mutate(
+  ellipse_convex_interp,
   habitat_area_acres_lower = habitat_area_acres * (1 - moe_prop),
   habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
 )
 
+ellipse_convex_interp <- dplyr::arrange(ellipse_convex_interp, flow_cfs)
+
 # visualize the elliptical arc interpolation with a 5% margin of error
 ggplot() +
   geom_ribbon(
-    data = ellipse_interp,
+    data = ellipse_convex_interp,
     aes(
       x = flow_cfs,
       ymin = habitat_area_acres_lower,
       ymax = habitat_area_acres_upper
     ),
-    fill = ggplot_cat_colors_light[3],
-    alpha = 0.5
+    fill = ggplot_cat_colors_light[4],
+    alpha = 0.45
   ) +
   geom_line(
-    data = ellipse_interp,
+    data = ellipse_convex_interp,
     aes(x = flow_cfs, y = habitat_area_acres),
-    color = ggplot_cat_colors_dark[3],
-    size = 1
+    color = ggplot_cat_colors_dark[4],
+    linewidth = 1
   ) +
   geom_point(
     data = feather_hab_flow_addl,
@@ -678,17 +710,97 @@ ggplot() +
     expand = c(0, 0)
   ) +
   labs(
-    title = "Ellipse interpolation",
+    title = "Ellipse interpolation (convex)",
     x = "discharge (cfs)",
     y = "habitat area (acres)"
   ) +
   theme_minimal() +
   theme(
     plot.title = element_text(margin = margin(b = 20)),
+    axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(margin = margin(t = 20)),
     axis.title.y = element_text(margin = margin(r = 20))
   )
 ```
+
+
+
+## Ellipse interpolation (concave)
+
+```{r}
+# create a concave elliptical arc between the second two coordinate pairs
+second_ellipse_concave_interp <- interpolate_ellipse(
+  x_start = as.numeric(feather_hab_flow_addl[2, "flow_cfs"]),
+  x_end   = as.numeric(feather_hab_flow_addl[3, "flow_cfs"]),
+  y_start = as.numeric(feather_hab_flow_addl[2, "habitat_area_acres"]),
+  y_end   = as.numeric(feather_hab_flow_addl[3, "habitat_area_acres"]), 
+  n = 900,
+  quadrant = "bl"
+)
+
+# combine into a single majority-concave elliptical arc interpolation
+ellipse_concave_interp <- rbind(
+  first_ellipse_interp,
+  second_ellipse_concave_interp
+)
+
+colnames(ellipse_concave_interp) <- c("flow_cfs", "habitat_area_acres")
+
+ellipse_concave_interp <- dplyr::mutate(
+  ellipse_concave_interp,
+  habitat_area_acres_lower = habitat_area_acres * (1 - moe_prop),
+  habitat_area_acres_upper = habitat_area_acres * (1 + moe_prop)
+)
+
+ellipse_concave_interp <- dplyr::arrange(ellipse_concave_interp, flow_cfs)
+
+# visualize the majority-concave elliptical arc interpolation with a 5% margin of error
+ggplot() +
+  geom_ribbon(
+    data = ellipse_concave_interp,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[5],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = ellipse_concave_interp,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[5],
+    linewidth = 1
+  ) +
+  geom_point(
+    data = feather_hab_flow_addl,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    size = 2
+  ) +
+  scale_x_continuous(
+    limits = c(600, 3200),
+    labels = scales::comma,
+    breaks = seq(from = 600, to = 3200, by = 400),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Ellipse interpolation (concave)",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(margin = margin(b = 20)),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+
+```
+
+
+
+## Summary of all interpolations
 
 ```{r visualize_all_interp}
 ggplot() +
@@ -699,62 +811,78 @@ ggplot() +
       ymin = habitat_area_acres_lower,
       ymax = habitat_area_acres_upper
     ),
-    fill = dark_grey,
-    alpha = 0.5
+    fill = ggplot_cat_colors_light[1],
+    alpha = 0.45
   ) +
   geom_line(
     data = feather_hab_flow_addl,
     aes(x = flow_cfs, y = habitat_area_acres),
-    color = black,
-    size = 1
-  ) +
-  geom_ribbon(
-    data = cubic_spline_anchored,
-    aes(
-      x = flow_cfs,
-      ymin = habitat_area_acres_lower,
-      ymax = habitat_area_acres_upper
-    ),
-    fill = ggplot_cat_colors_light[1],
-    alpha = 0.5
-  ) +
-  geom_line(
-    data = cubic_spline_anchored,
-    aes(x = flow_cfs, y = habitat_area_acres),
     color = ggplot_cat_colors_dark[1],
-    size = 1
+    linewidth = 1
   ) +
   geom_ribbon(
-    data = sine_interp,
+    data = cubic_spline_anchored,
     aes(
       x = flow_cfs,
       ymin = habitat_area_acres_lower,
       ymax = habitat_area_acres_upper
     ),
     fill = ggplot_cat_colors_light[2],
-    alpha = 0.5
+    alpha = 0.45
   ) +
   geom_line(
-    data = sine_interp,
+    data = cubic_spline_anchored,
     aes(x = flow_cfs, y = habitat_area_acres),
     color = ggplot_cat_colors_dark[2],
-    size = 1
+    linewidth = 1
   ) +
-    geom_ribbon(
-    data = ellipse_interp,
+  geom_ribbon(
+    data = sine_interp,
     aes(
       x = flow_cfs,
       ymin = habitat_area_acres_lower,
       ymax = habitat_area_acres_upper
     ),
     fill = ggplot_cat_colors_light[3],
-    alpha = 0.5
+    alpha = 0.45
   ) +
   geom_line(
-    data = ellipse_interp,
+    data = sine_interp,
     aes(x = flow_cfs, y = habitat_area_acres),
     color = ggplot_cat_colors_dark[3],
-    size = 1
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = ellipse_convex_interp,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[4],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = ellipse_convex_interp,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[4],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = ellipse_concave_interp,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = ggplot_cat_colors_light[5],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = ellipse_concave_interp,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = ggplot_cat_colors_dark[5],
+    linewidth = 1
   ) +
   geom_point(
     data = feather_hab_flow_addl,
@@ -776,6 +904,7 @@ ggplot() +
   theme_minimal() +
   theme(
     plot.title = element_text(margin = margin(b = 20)),
+    axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(margin = margin(t = 20)),
     axis.title.y = element_text(margin = margin(r = 20))
   )
@@ -783,7 +912,105 @@ ggplot() +
 
 
 
-##
+## Area under the curves
 
-```{r}
+```{r integrate_flow_area_curves, out.height = "150%"}
+# calculate areas under the curves; areas are approximate since they are 
+# computed with an integral using the trapezoidal rule over x and y values, but
+# all interpolated series have 1,000 observations so it should be close enough
+area_linear <- pracma::trapz(
+  x = feather_hab_flow_addl$flow_cfs,
+  y = feather_hab_flow_addl$habitat_area_acres
+)
+
+area_cubic_spline_anchored <- pracma::trapz(
+  x = cubic_spline_anchored$flow_cfs,
+  y = cubic_spline_anchored$habitat_area_acres
+)
+
+area_sine <- pracma::trapz(
+  x = sine_interp$flow_cfs,
+  y = sine_interp$habitat_area_acres
+)
+
+area_ellipse_convex <- pracma::trapz(
+  x = ellipse_convex_interp$flow_cfs,
+  y = ellipse_convex_interp$habitat_area_acres
+)
+
+area_ellipse_concave <- pracma::trapz(
+  x = ellipse_concave_interp$flow_cfs,
+  y = ellipse_concave_interp$habitat_area_acres
+)
+
+# summarize areas under the curves
+interp_areas <- tibble::tribble(
+  ~interp_method,            ~area,
+  "linear",                  area_linear,
+  "cubic spline (anchored)", area_cubic_spline_anchored,
+  "sine curve",              area_sine,
+  "ellipse arc (convex)",    area_ellipse_convex,
+  "ellipse arc (concave)",   area_ellipse_concave
+)
+
+interp_areas <- dplyr::mutate(
+  interp_areas, 
+  interp_method = factor(
+    interp_method,
+    levels = c(
+      "linear",
+      "cubic spline (anchored)",
+      "sine curve",
+      "ellipse arc (convex)",
+      "ellipse arc (concave)"
+    )
+  ),
+  area_lower = area * (1 - moe_prop),
+  area_upper = area * (1 + moe_prop)
+)
+
+# visualize areas under the curves
+ggplot(
+    data = interp_areas,
+    aes(x = interp_method, y = area, fill = interp_method)
+  ) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(
+    aes(ymin = area_lower, ymax = area_upper),
+    color = dark_grey,
+    linewidth = 1,
+    width = 0.1
+  ) +
+  geom_hline(
+    yintercept = min(interp_areas$area_lower),
+    linetype = "dashed",
+    color = dark_grey,
+    linewidth = 1
+  ) +
+  geom_hline(
+    yintercept = max(interp_areas$area_upper),
+    linetype = "dashed",
+    color = dark_grey,
+    linewidth = 1
+  ) +
+  scale_y_continuous(
+    labels = scales::comma,
+    breaks = seq(from = 0, to = 12000, by = 2000),
+    expand = c(0, 500)
+  ) +
+  scale_fill_manual(values = ggplot_cat_colors_light) +
+  labs(
+    title = "Integrated flow-habitat area curves",
+    x = "interpolation method",
+    y = "area under the curve (acres)",
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(margin = margin(b = 20)),
+    legend.position = "none",
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(margin = margin(t = 20)),
+    axis.title.y = element_text(margin = margin(r = 20)),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 ```
