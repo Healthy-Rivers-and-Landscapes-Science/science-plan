@@ -229,12 +229,14 @@ ggplot() +
   scale_x_continuous(
     labels = scales::percent,
     breaks = seq(0, 1, by = 0.1),
-    limits = c(0, 1)
+    limits = c(0, 1),
+    expand = c(0, NA)
   ) +
   scale_y_continuous(
     labels = scales::comma,
     trans = "log10",
-    breaks = c(1000, 2000, 5000, 10000, 20000, 50000)
+    breaks = c(1000, 2000, 5000, 10000, 20000, 50000),
+    expand = c(0, NA)
   ) +
   labs(
     x = "percent exceedance",
@@ -330,8 +332,10 @@ interpolate_sine <- function(x_start, x_end, y_start, y_end, n) {
 
 # create a function that interpolates between two coordinate pairs with an ellipse arc
 interpolate_ellipse <- function(x_start,
-                                x_end, y_start,
-                                y_end, n,
+                                x_end,
+                                y_start,
+                                y_end,
+                                n,
                                 quadrant = "ur") {
   # set theta range and center based on the selected quadrant (upper-right,
   # upper-left, bottom-right, or bottom-left)
@@ -1002,7 +1006,7 @@ ggplot(
   labs(
     title = "Integrated flow-habitat area curves",
     x = "interpolation method",
-    y = "area under the curve (acres)",
+    y = "area under the curve",
   ) +
   theme_minimal() +
   theme(
