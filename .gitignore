@@ -50,3 +50,4 @@ rsconnect/
 
 # large files that shouldn't be on GitHub (run `data-raw` scripts to produce locally)
 workshop/feather_river/data-raw/nhdplushr/
+workshop/feather_river/data/flowlines.rda
