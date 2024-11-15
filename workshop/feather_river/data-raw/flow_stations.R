@@ -17,7 +17,8 @@ flow_stations <- dplyr::mutate(
 flow_stations <- sf::st_as_sf(
   x = flow_stations,
   coords = c("lon", "lat"),
-  crs = global_crs
+  crs = global_crs,
+  dim = "XY"
 )
 
 # write out flow stations

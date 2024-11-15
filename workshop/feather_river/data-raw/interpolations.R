@@ -280,7 +280,7 @@ sbrs_interpolation_areas <- tibble::tribble(
 
 sbrs_interpolation_areas <- dplyr::mutate(
   sbrs_interpolation_areas,
-  sbrs_interpolation_areas = factor(
+  interpolation_method = factor(
     interpolation_method,
     levels = c(
       "linear",

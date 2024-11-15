@@ -10,7 +10,8 @@ yuba_city <- tibble::tribble(
 yuba_city <- sf::st_as_sf(
   x = yuba_city,
   coords = c("lon", "lat"),
-  crs = global_crs
+  crs = global_crs,
+  dim = "XY"
 )
 
 # write out Yuba City

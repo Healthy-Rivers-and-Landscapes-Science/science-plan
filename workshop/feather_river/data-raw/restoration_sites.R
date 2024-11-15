@@ -19,7 +19,8 @@ restoration_sites <- dplyr::mutate(
 restoration_sites <- sf::st_as_sf(
   x = restoration_sites,
   coords = c("lon", "lat"),
-  crs = global_crs
+  crs = global_crs,
+  dim = "XY"
 )
 
 # write out restoration sites
