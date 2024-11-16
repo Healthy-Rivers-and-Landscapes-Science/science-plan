@@ -1,9 +1,6 @@
 ### set up ---------------------------------------------------------------------
 
-# attach packages
-library(ggplot2)
-
-# source global variables
+# source global variables and attach packages
 source(here::here("workshop", "habs", "globals.R"))
 
 # load objects

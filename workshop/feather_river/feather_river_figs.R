@@ -1,9 +1,6 @@
 ### set up ---------------------------------------------------------------------
 
-# attach packages
-library(ggplot2)
-
-# source global variables
+# source global variables and attach packages
 source(here::here("workshop", "feather_river", "globals.R"))
 
 # load objects

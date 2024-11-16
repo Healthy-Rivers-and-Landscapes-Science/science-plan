@@ -11,6 +11,7 @@ load(here::here("workshop", "feather_river", "data", "sbrs_flow_area.rda"))
 
 
 ### create a linear interpolation ----------------------------------------------
+
 sbrs_linear_interpolation <- dplyr::mutate(
   sbrs_flow_area,
   habitat_area_acres_lower = habitat_area_acres * (1 - moe_prop),
@@ -28,6 +29,7 @@ save(
 
 
 ### create an unanchored cubic spline interpolation ----------------------------
+
 sbrs_unanchored_cubic_spline_interpolation <- as.data.frame(stats::spline(
   x = sbrs_flow_area$flow_cfs,
   y = sbrs_flow_area$habitat_area_acres,
