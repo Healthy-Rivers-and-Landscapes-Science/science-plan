@@ -1,5 +1,4 @@
 # set up
-library(ggplot2)
 source(here::here("workshop", "habs", "globals.R"))
 
 # pull Environmental Monitoring Program Discrete Water Quality data from EDI
@@ -56,7 +55,7 @@ emp_dwq_1975_2023 <- dplyr::mutate(
 )
 
 # summarize sites by season
-microcystis_summary <- emp_dwq_1975_2023 |>
+microcystis <- emp_dwq_1975_2023 |>
   dplyr::group_by(station, season) |>
   dplyr::summarize(
     microcystis_90th = {
@@ -68,8 +67,8 @@ microcystis_summary <- emp_dwq_1975_2023 |>
   )
 
 # create factors needed for visualization
-microcystis_summary <- dplyr::mutate(
-  microcystis_summary,
+microcystis <- dplyr::mutate(
+  microcystis,
   season = factor(season, levels = c("winter", "summer")),
   microcystis_90th_bin = dplyr::case_when(
     microcystis_90th >= 4 ~ "high",
@@ -85,25 +84,44 @@ microcystis_summary <- dplyr::mutate(
     factor(levels = c("absent", "low", "high"))
 )
 
-# add coordinates and convert `microcystis_summary` to an `sf` object
-microcystis_summary <- dplyr::left_join(
-  x = microcystis_summary,
+# add coordinates and convert microcystis summary to an sf object
+microcystis <- dplyr::left_join(
+  x = microcystis,
   y = dplyr::select(emp_dwq_stations_1975_2023, station, latitude, longitude),
   by = "station"
 )
 
-microcystis_summary <- dplyr::filter(microcystis_summary, !is.na(latitude))
+microcystis <- dplyr::filter(microcystis, !is.na(latitude))
 
-microcystis_summary <- sf::st_as_sf(
-  x = microcystis_summary,
+microcystis <- sf::st_as_sf(
+  x = microcystis,
   coords = c("longitude", "latitude"),
   crs = global_crs
 )
 
-# save `microcystis_summary`
-save(
-  microcystis_summary,
-  file = here::here("workshop", "habs", "data", "microcystis_summary.rda")
+# create a stations spatial object
+emp_stations <- dplyr::filter(
+  emp_dwq_stations_1975_2023,
+  !is.na(latitude),
+  !is.na(longitude)
 )
 
+emp_stations <- sf::st_as_sf(
+  x = emp_stations,
+  coords = c("longitude", "latitude"),
+  crs = global_crs,
+  dim = "XY"
+)
+
+# save microcystis summary data
+save(
+  microcystis,
+  file = here::here("workshop", "habs", "data", "microcystis.rda")
+)
+
+# save stations data
+save(
+  emp_stations,
+  file = here::here("workshop", "habs", "data", "emp_stations.rda")
+)
 
