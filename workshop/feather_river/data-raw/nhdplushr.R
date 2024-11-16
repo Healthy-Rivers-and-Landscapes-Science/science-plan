@@ -79,49 +79,6 @@ flowlines <- dplyr::select(
   aggregate_id_to_measure = tomeas
 )
 
-flowlines <- dplyr::select(
-  flowlines,
-
-  id,
-
-  fromnode,
-  tonode,
-  divergence,
-  wbid,
-
-  total_da_sqkm,
-  da_sqkm,
-  length_km,
-  pathlength_km,
-  arbolate_sum,
-
-  topo_sort,
-  up_topo_sort,
-  dn_topo_sort,
-  dn_minor_topo_sort,
-
-  terminal_topo_sort,
-  terminal_flag,
-  start_flag,
-
-  levelpath,
-  up_levelpath,
-  dn_levelpath,
-
-  stream_level,
-  dn_stream_level,
-  stream_order,
-  stream_calculator,
-
-  feature_type,
-  feature_type_code,
-  vector_proc_unit,
-
-  aggregate_id,
-  aggregate_id_from_measure,
-  aggregate_id_to_measure
-)
-
 # write out flowlines
 save(
   flowlines,
