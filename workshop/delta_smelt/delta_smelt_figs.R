@@ -30,7 +30,7 @@ point_colors <- c("#005585", "#d39200")
 
 
 
-### create a single object for mapping =----------------------------------------
+### create a single object for mapping -----------------------------------------
 
 dsls_stations <- dplyr::mutate(
   dsls_stations,
@@ -51,7 +51,7 @@ monitoring_locations <- rbind(
 
 
 
-### create a map =--------------------------------------------------------------
+### create a map ---------------------------------------------------------------
 
 facet_labels <- c(
   "dsls" = "IEP spring Kodiak trawl",

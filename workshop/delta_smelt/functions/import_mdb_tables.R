@@ -1,3 +1,5 @@
+# import all tables in a .mdb database and assign tables to objects based on
+# table names
 import_mdb_tables <- function(mdb_file, table_names) {
   for (table_name in table_names) {
     csv_file <- tempfile(fileext = ".csv")

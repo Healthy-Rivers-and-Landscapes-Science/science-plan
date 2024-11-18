@@ -1,3 +1,4 @@
+# create a function to pull .mdb database table names when names have spaces
 get_mdb_table_names <- function(mdb_file) {
   raw_tables <- system(paste("mdb-tables -d '|' ", mdb_file), intern = TRUE)
   table_names <- unlist(strsplit(raw_tables, split = "\\|"))
