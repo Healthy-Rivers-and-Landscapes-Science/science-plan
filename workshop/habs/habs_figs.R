@@ -331,7 +331,7 @@ microcystis_all <- microcystis_all |>
   dplyr::arrange(longitude) |>
   dplyr::mutate(station = factor(station, levels = unique(station)))
 
-# computation proportions for proportional stacked bar charts
+# compute proportions for proportional stacked bar charts
 microcystis_all_props <- microcystis_all |>
   dplyr::group_by(station, severity_cat) |>
   dplyr::summarize(count = dplyr::n(), .groups = "drop") |>
