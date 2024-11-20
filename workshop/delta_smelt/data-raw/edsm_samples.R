@@ -30,9 +30,24 @@ for (i in seq_len(nrow(entity_names))) {
 # clean data
 colnames(edsm_kdtr_csv) <- snakecase::to_snake_case(colnames(edsm_kdtr_csv))
 
-edsm_sample_locations <- dplyr::select(
+edsm_samples <- dplyr::mutate(
   edsm_kdtr_csv,
+  year = lubridate::year(sample_date),
+  month = lubridate::month(sample_date)
+)
+
+edsm_sample_locations <- dplyr::filter(
+  edsm_samples,
+  year == 2022,
+  month %in% c(1:5, 12)
+)
+
+edsm_sample_locations <- dplyr::select(
+  edsm_sample_locations,
   station_code,
+  region_code,
+  year,
+  month,
   longitude,
   latitude
 )
@@ -48,6 +63,11 @@ edsm_sample_locations <- sf::st_as_sf(
 
 # write out data
 save(
+  edsm_samples,
+  file = here::here("workshop", "delta_smelt", "data", "edsm_samples.rda")
+)
+
+save(
   edsm_sample_locations,
-  file = here::here("workshop", "delta_smelt", "data", "edsm_sample_locations.eda")
+  file = here::here("workshop", "delta_smelt", "data", "edsm_sample_locations.rda")
 )
