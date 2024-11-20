@@ -49,6 +49,7 @@ po/*~
 rsconnect/
 
 # large files that shouldn't be on GitHub (run `data-raw` scripts to produce locally)
+workshop/delta_smelt/data-raw/dsls.mdb
+workshop/early_impl/data-raw/nhdplushr/
 workshop/feather_river/data-raw/nhdplushr/
 workshop/feather_river/data/flowlines.rda
-workshop/delta_smelt/data-raw/dsls.mdb
