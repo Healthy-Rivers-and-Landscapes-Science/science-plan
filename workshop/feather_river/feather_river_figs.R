@@ -73,6 +73,73 @@ feather_flowlines <- dplyr::filter(flowlines, id %in% trace_ids)
 
 
 
+### create polygons to represent restoration sites as though the are parcels ---
+
+scale_factor <- 0.04
+
+restoration_polygons <- list(
+  sf::st_polygon(list(matrix(c(
+    # L shape
+    2.12, 0.71,
+    2.83, 1.41,
+    3.54, 0.71,
+    2.83, 0.00,
+    3.54, -0.71,
+    2.83, -1.41,
+    2.12, -0.71,
+    1.41, 0.00,
+    2.12, 0.71
+  ) * scale_factor * 0.5, ncol = 2, byrow = TRUE))),
+  sf::st_polygon(list(matrix(c(
+    # rectangle
+    0.00, 0.00,
+    0.71, -0.71,
+    1.06, -0.35,
+    0.35, 0.35,
+    0.00, 0.00
+  ) * scale_factor, ncol = 2, byrow = TRUE))),
+  sf::st_polygon(list(matrix(c(
+    # rectangle
+    0.00, 0.00,
+    0.91, 0.42,
+    0.06, 2.18,
+    -0.85, 1.76,
+    0.00, 0.00
+  ) * scale_factor * 0.8, ncol = 2, byrow = TRUE))),
+  sf::st_polygon(list(matrix(c(
+    0.00, 0.00,
+    -0.71, 0.71,
+    -0.35, 1.06,
+    -0.71, 1.41,
+    -0.35, 1.77,
+    -0.18, 1.59,
+    0.53, 2.30,
+    1.41, 1.41,
+    0.00, 0.00
+  ) * scale_factor * 0.9, ncol = 2, byrow = TRUE)))
+)
+
+restoration_polygons <- sf::st_sf(
+  geometry = st_sfc(restoration_polygons, crs = global_crs),
+  shape = c("l_shape", "rect_1", "rect_2", "funky"),
+  id = 1:4
+)
+
+restoration_polygons <- restoration_polygons |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    geometry = sf::st_sfc(
+      sf::st_geometry(geometry) +
+        (sf::st_coordinates(restoration_sites[restoration_sites$id == id, ])[1, ] -
+           sf::st_coordinates(sf::st_centroid(geometry))[1, ]),
+      crs = global_crs
+    )
+  )
+
+
+
+
+
 ### create color schemes -------------------------------------------------------
 
 # create basic colors
@@ -81,18 +148,18 @@ mid_grey <- "#d3d3d3"
 dark_grey <- "#898989"
 black <- "#000000"
 
-# create colors for restoration sites
-restoration_colors <- c("#6a00b8", "#0000ff", "#00ced1", "#00ff7f", "#32cd32")
+red <- "#f4684e"
+yellow <- "#f1ee00"
 
 # create colors for flow stations
-flow_station_colors <- c("#e23d3d", "#ff8700", "#ffd700")
+flow_station_colors <- c("#f4684e", "#4042ef", "#f4a611")
 
 # create colors for hydrographs that match flow stations
 water_year_color <- unlist(lapply(flow_station_colors, function(color) {
   c(
-    colorspace::lighten(color, amount = 0.3),
+    colorspace::lighten(color, amount = 0.4),
     color,
-    colorspace::darken(color, amount = 0.3)
+    colorspace::darken(color, amount = 0.7)
   )
 }))
 
@@ -109,8 +176,27 @@ flows <- dplyr::left_join(
 
 # create colors for visualizing flow-habitat area curves
 interpolation_colors <- scale_colour_hue()$palette(5)
-interpolation_colors_light <- colorspace::lighten(interpolation_colors, amount = 0.3)
-interpolation_colors_dark <- colorspace::darken(interpolation_colors, amount = 0.3)
+
+interpolation_colors_light <- colorspace::lighten(
+  interpolation_colors,
+  amount = 0.3
+)
+
+interpolation_colors_dark <- colorspace::darken(
+  interpolation_colors,
+  amount = 0.3
+)
+
+
+
+
+
+### create other visualization parameters --------------------------------------
+
+flow_area_x_lower <- 500
+flow_area_x_upper <- 3500
+flow_area_y_lower <- 2.5
+flow_area_y_upper <- 5.0
 
 
 
@@ -129,17 +215,22 @@ ggplot(
     linewidth = 0.75,
     linetype = "dashed"
   ) +
-  geom_point(size = 5) +
   geom_vline(
     xintercept = max(sbrs_linear_interpolation$flow_cfs),
     color = dark_grey,
     linewidth = 0.75,
     linetype = "dashed"
   ) +
+  geom_point(size = 8) +
   scale_x_continuous(
-    limits = c(600, 3200),
+    limits = c(flow_area_x_lower, flow_area_x_upper),
     labels = scales::comma,
-    breaks = seq(from = 600, to = 3200, by = 400),
+    breaks = seq(from = flow_area_x_lower, to = flow_area_x_upper, by = 500),
+    expand = c(0, 200)
+  ) +
+  scale_y_continuous(
+    limits = c(flow_area_y_lower, flow_area_y_upper),
+    breaks = seq(from = flow_area_y_lower, to = flow_area_y_upper, by = 0.5),
     expand = c(0, 0)
   ) +
   labs(
@@ -151,14 +242,22 @@ ggplot(
   theme(
     plot.title = element_text(
       color = black,
-      size = 16,
+      size = 24,
       face = "bold",
       margin = margin(b = 20)
     ),
     axis.line = element_line(color = dark_grey),
-    axis.title.x = element_text(size = 14, color = black, margin = margin(t = 20)),
-    axis.title.y = element_text(size = 14, color = black, margin = margin(r = 20)),
-    axis.text = element_text(size = 12, color = black)
+    axis.title.x = element_text(
+      size = 18,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 18,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 16, color = black)
   )
 
 # write out SBRS data plot
@@ -166,9 +265,9 @@ ggsave(
   filename = "sbrs_flow_area_points.png",
   path = here::here("workshop", "feather_river", "figs"),
   device = "png",
-  dpi = 320,
-  height = 1800,
-  width = 2400,
+  dpi = 700,
+  height = 3600,
+  width = 5200,
   units = "px",
   bg = white
 )
@@ -188,36 +287,49 @@ ggplot() +
     linewidth = 1
   ) +
   geom_sf(data = feather_flowlines, color = black, linewidth = 1) +
-  geom_sf(data = yuba_city, color = black, fill = black, shape = 22, size = 5) +
-  geom_sf_text(data = yuba_city, aes(label = label), nudge_x = -0.08, size = 5) +
   geom_sf(
-    data = restoration_sites,
-    aes(fill = name),
+    data = yuba_city,
     color = black,
-    shape = 21,
+    fill = black,
+    shape = 22,
     size = 5
   ) +
-  scale_fill_manual(
-    name = "Planned restoration sites",
-    values = restoration_colors
+  geom_sf_text(
+    data = yuba_city,
+    aes(label = label),
+    nudge_x = -0.1,
+    size = 6
   ) +
-  ggnewscale::new_scale_fill() +
+  geom_sf(
+    data = restoration_polygons,
+    aes(shape = "potential\nrestoration site"),
+    fill = yellow,
+    color = black,
+    linewidth = 1,
+    size = 5
+  ) +
   geom_sf(
     data = flow_stations,
-    aes(fill = location_id),
+    aes(shape = "flow gage"),
+    fill = red,
     color = black,
-    shape = 24,
+    stroke = 1.5,
     size = 5
   ) +
-  scale_fill_manual(name = "Flow gages", values = flow_station_colors) +
-  labs(title = "Feather River gaging and proposed habitat restoration") +
+  scale_shape_manual(
+    values = c("flow gage" = 24, "potential\nrestoration site" = 22),
+    guide = guide_legend(byrow = TRUE, override.aes = list(size = 5))
+  ) +
+  labs(title = "Feather River gaging and\nproposed habitat restoration") +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, color = black, face = "bold"),
+    plot.title = element_text(size = 24, color = black, face = "bold"),
     axis.title = element_blank(),
     axis.text = element_blank(),
-    legend.title = element_text(size = 14, color = black, face = "bold"),
-    legend.text = element_text(size = 14, color = black),
+    legend.title = element_blank(),
+    legend.text = element_text(size = 20, color = black),
+    legend.key.size = unit(0.5, "cm"),
+    legend.key.spacing.y = unit(0.5, "cm"),
     panel.grid = element_blank()
   )
 
@@ -226,9 +338,9 @@ ggsave(
   filename = "feather_river_map_gaging_restoration.png",
   path = here::here("workshop", "feather_river", "figs"),
   device = "png",
-  dpi = 320,
-  height = 2400,
-  width = 3200,
+  dpi = 700,
+  height = 4800,
+  width = 6400,
   units = "px",
   bg = white
 )
@@ -239,51 +351,61 @@ ggsave(
 
 ### create faceted hydrographs -------------------------------------------------
 
-# create a hydrographs plot
+# prep the data
+y_limit <- 20000
+flows_clipped <- dplyr::mutate(
+  flows,
+  exceed = parameter_value > y_limit,
+  parameter_value = ifelse(exceed, y_limit, parameter_value)
+)
+
+# create the hydrographs
 hydrographs <- ggplot(
-  data = flows,
+  data = dplyr::filter(
+    flows_clipped,
+    water_year_day >= 93 & water_year_day <= 305
+  ),
   aes(
     x = water_year_day,
     y = parameter_value,
     color = water_year_color,
     group = water_year
   )) +
+  geom_vline(
+    xintercept = c(93, 124, 152, 183, 213, 244, 274),
+    color = "#d9d9d9",
+    linewidth = 0.5
+  ) +
   annotate(
     "rect",
-    xmin = 93,
+    xmin = 124,
     xmax = 274,
     ymin = -Inf,
     ymax = Inf,
     fill = mid_grey,
     alpha = 0.45
   ) +
-  geom_line(linewidth = 1) +
+  ggplot2::geom_line(linewidth = 0.75) +
   geom_hline(
-    yintercept = min(sbrs_flow_area$flow_cfs),
-    color = dark_grey,
+    yintercept = c(min(sbrs_flow_area$flow_cfs), max(sbrs_flow_area$flow_cfs)),
+    color = black,
     linewidth = 0.75,
     linetype = "dashed"
   ) +
-  geom_hline(
-    yintercept = max(sbrs_flow_area$flow_cfs),
-    color = dark_grey,
-    linewidth = 0.75,
-    linetype = "dashed"
-  ) +
-  facet_wrap(~ location_id, ncol = 1) +
   scale_x_continuous(
-    breaks = c(1, 32, 62, 93, 124, 152, 183, 213, 244, 274, 305, 336),
-    labels = c("Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-               "Jul", "Aug", "Sep"),
+    breaks = c(108.5, 138, 167.5, 198, 228.5, 259, 289.5),
+    labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"),
+    limits = c(93, 304),
     expand = c(0, 0)
   ) +
   scale_y_continuous(
     labels = scales::comma,
-    breaks = seq(from = 0, to = 50000, by = 10000),
-    limits = c(0, NA),
+    breaks = seq(from = 0, to = y_limit, by = 5000),
+    limits = c(0, y_limit),
     expand = c(0, 0)
   ) +
   scale_color_identity() +
+  facet_wrap(~ location_id, ncol = 1) +
   labs(
     title = "Feather River hydrographs",
     y = "dischage (cfs)",
@@ -291,21 +413,35 @@ hydrographs <- ggplot(
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, color = black, face = "bold"),
-    strip.text = element_text(size = 14, color = black, face = "bold"),
+    plot.title = element_text(size = 24, color = black, face = "bold"),
+    strip.text = element_text(
+      size = 18,
+      color = black,
+      face = "bold",
+      margin = margin(t = 20, b = 10)
+    ),
     legend.position = "bottom",
     legend.title.position = "top",
     legend.title = element_text(hjust = 0.5),
     axis.line = element_line(color = dark_grey),
     axis.title.x = element_blank(),
-    axis.text.x = element_text(size = 12, color = black, angle = 45, hjust = 1),
-    axis.title.y = element_text(size = 14, color = black, margin = margin(r = 10)),
-    axis.text.y = element_text(size = 12, color = black),
+    axis.text.x = element_text(size = 16, color = black),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 10)
+    ),
+    axis.text.y = element_text(size = 14, color = black),
+    panel.grid.major.x = element_blank(),
     panel.grid.minor = element_blank()
   )
 
 # create a standalone legend for the water years in shades of grey and black
-hydrograph_legend_data <- data.frame(water_year = factor(unique(flows$water_year)))
+hydrograph_legend_data <- data.frame(
+  water_year = rep(c("2021-2022", "2022-2023", "2023-2024"), each = 2),
+  x = rep(c(1, 2), times = 3),
+  y = rep(1, 6)
+)
 
 hydrograph_legend_colors <- setNames(
   c(mid_grey, dark_grey, black),
@@ -314,38 +450,37 @@ hydrograph_legend_colors <- setNames(
 
 hydrographs_legend <- ggplot(
   data = hydrograph_legend_data,
-  aes(x = water_year, color = water_year)
-  ) +
-  geom_line(aes(y = 1), linewidth = 2) +
+  aes(x = x, y = y, color = water_year, group = water_year)
+) +
+  geom_line(linewidth = 2) +
   scale_color_manual(
     values = hydrograph_legend_colors,
-    name = "Water year"
+    name = "water year"
   ) +
   theme_void() +
   theme(
-    legend.title = element_text(size = 14, face = "bold", hjust = 0.5),
-    legend.text = element_text(size = 14)
+    legend.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    legend.text = element_text(size = 18)
   )
 
 hydrographs_legend <- cowplot::get_legend(hydrographs_legend)
 
 # combine hydrographs plot and standalone legend
-hydrographs_w_legend <- cowplot::plot_grid(
+cowplot::plot_grid(
   hydrographs,
   hydrographs_legend,
   ncol = 2,
-  rel_widths = c(4, 0.8)
+  rel_widths = c(4, 1)
 )
 
 # write out the hydrographs
 ggsave(
-  plot = hydrographs_w_legend,
   filename = "feather_river_hydrographs.png",
   path = here::here("workshop", "feather_river", "figs"),
   device = "png",
-  dpi = 320,
-  height = 3200,
-  width = 2800,
+  dpi = 700,
+  height = 6800,
+  width = 6000,
   units = "px",
   bg = white
 )
@@ -356,7 +491,463 @@ ggsave(
 
 ### plot interpolations --------------------------------------------------------
 
-# create a plot of interpolated curves
+# create a plot showing a linear interpolation
+ggplot() +
+  geom_line(
+    data = sbrs_linear_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[1],
+    linewidth = 1
+  ) +
+  geom_point(
+    data = sbrs_flow_area,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 5
+  ) +
+  scale_x_continuous(
+    limits = c(500, 3250),
+    labels = scales::comma,
+    breaks = seq(from = 500, to = 3000, by = 500),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(1.5, 5.5),
+    breaks = seq(from = 2, to = 5, by = 1),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Interpolated flow-area relationships",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      color = black,
+      size = 22,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(
+      size = 16,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 14, color = black)
+  )
+
+# write out linear interpolation plot
+ggsave(
+  filename = "interpolation_1_linear.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 3600,
+  width = 5200,
+  units = "px",
+  bg = white
+)
+
+# create a plot showing a linear interpolation with a margin of error
+ggplot() +
+  geom_ribbon(
+    data = sbrs_linear_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[1],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_linear_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[1],
+    linewidth = 1
+  ) +
+  geom_point(
+    data = sbrs_flow_area,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 5
+  ) +
+  scale_x_continuous(
+    limits = c(500, 3250),
+    labels = scales::comma,
+    breaks = seq(from = 500, to = 3000, by = 500),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(1.5, 5.5),
+    breaks = seq(from = 2, to = 5, by = 1),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Interpolated flow-area relationships",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      color = black,
+      size = 22,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(
+      size = 16,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 14, color = black)
+  )
+
+# write out linear interpolation plot
+ggsave(
+  filename = "interpolation_2_linear_w_error.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 3600,
+  width = 5200,
+  units = "px",
+  bg = white
+)
+
+# add an anchored cubic spline interpolation
+ggplot() +
+  geom_ribbon(
+    data = sbrs_linear_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[1],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_linear_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[1],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_anchored_cubic_spline_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[2],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_anchored_cubic_spline_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[2],
+    linewidth = 1
+  ) +
+  geom_point(
+    data = sbrs_flow_area,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 5
+  ) +
+  scale_x_continuous(
+    limits = c(500, 3250),
+    labels = scales::comma,
+    breaks = seq(from = 500, to = 3000, by = 500),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(1.5, 5.5),
+    breaks = seq(from = 2, to = 5, by = 1),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Interpolated flow-area relationships",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      color = black,
+      size = 22,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(
+      size = 16,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 14, color = black)
+  )
+
+# write out cubic spline interpolation plot
+ggsave(
+  filename = "interpolation_3_cubic_spline.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 3600,
+  width = 5200,
+  units = "px",
+  bg = white
+)
+
+# add a sine curve interpolation
+ggplot() +
+  geom_ribbon(
+    data = sbrs_linear_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[1],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_linear_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[1],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_anchored_cubic_spline_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[2],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_anchored_cubic_spline_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[2],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_sine_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[3],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_sine_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[3],
+    linewidth = 1
+  ) +
+  geom_point(
+    data = sbrs_flow_area,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 5
+  ) +
+  scale_x_continuous(
+    limits = c(500, 3250),
+    labels = scales::comma,
+    breaks = seq(from = 500, to = 3000, by = 500),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(1.5, 5.5),
+    breaks = seq(from = 2, to = 5, by = 1),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Interpolated flow-area relationships",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      color = black,
+      size = 22,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(
+      size = 16,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 14, color = black)
+  )
+
+# write out sine interpolation plot
+ggsave(
+  filename = "interpolation_4_sine.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 3600,
+  width = 5200,
+  units = "px",
+  bg = white
+)
+
+# add a convex ellipse interpolation
+ggplot() +
+  geom_ribbon(
+    data = sbrs_linear_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[1],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_linear_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[1],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_anchored_cubic_spline_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[2],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_anchored_cubic_spline_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[2],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_sine_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[3],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_sine_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[3],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_ellipse_convex_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[4],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_ellipse_convex_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[4],
+    linewidth = 1
+  ) +
+  geom_point(
+    data = sbrs_flow_area,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 5
+  ) +
+  scale_x_continuous(
+    limits = c(500, 3250),
+    labels = scales::comma,
+    breaks = seq(from = 500, to = 3000, by = 500),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(1.5, 5.5),
+    breaks = seq(from = 2, to = 5, by = 1),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Interpolated flow-area relationships",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      color = black,
+      size = 22,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(
+      size = 16,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 14, color = black)
+  )
+
+# write out convex ellipse interpolation plot
+ggsave(
+  filename = "interpolation_5_ellipse_convex.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 3600,
+  width = 5200,
+  units = "px",
+  bg = white
+)
+
+# add a concave ellipse interpolation to create a plot of all interpolations
 ggplot() +
   geom_ribbon(
     data = sbrs_linear_interpolation,
@@ -445,9 +1036,14 @@ ggplot() +
     size = 5
   ) +
   scale_x_continuous(
-    limits = c(600, 3200),
+    limits = c(500, 3250),
     labels = scales::comma,
-    breaks = seq(from = 600, to = 3200, by = 400),
+    breaks = seq(from = 500, to = 3000, by = 500),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(1.5, 5.5),
+    breaks = seq(from = 2, to = 5, by = 1),
     expand = c(0, 0)
   ) +
   labs(
@@ -459,24 +1055,189 @@ ggplot() +
   theme(
     plot.title = element_text(
       color = black,
-      size = 16,
+      size = 22,
       face = "bold",
       margin = margin(b = 20)
     ),
     axis.line = element_line(color = dark_grey),
-    axis.title.x = element_text(size = 14, color = black, margin = margin(t = 20)),
-    axis.title.y = element_text(size = 14, color = black, margin = margin(r = 20)),
-    axis.text = element_text(size = 12, color = black)
+    axis.title.x = element_text(
+      size = 16,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 14, color = black)
   )
 
-# write out interpolated curves plot
+
+# write out convex ellipse interpolation plot
 ggsave(
-  filename = "sbrs_interpolation_curves.png",
+  filename = "interpolation_6_all.png",
   path = here::here("workshop", "feather_river", "figs"),
   device = "png",
-  dpi = 320,
-  height = 1800,
-  width = 2400,
+  dpi = 700,
+  height = 3600,
+  width = 5200,
+  units = "px",
+  bg = white
+)
+
+# create a plot with an extended x axis matching flow range
+ggplot() +
+  annotate(
+    "rect",
+    xmin = 3000,
+    xmax = 10500,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = mid_grey,
+    alpha = 0.45
+  ) +
+  annotate(
+    "text",
+    x = (3000 + 10500) / 2,
+    y = 3.5,
+    label = "?",
+    size = 48,
+    fontface = "bold",
+    color = black
+  ) +
+  geom_ribbon(
+    data = sbrs_linear_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[1],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_linear_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[1],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_anchored_cubic_spline_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[2],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_anchored_cubic_spline_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[2],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_sine_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[3],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_sine_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[3],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_ellipse_convex_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[4],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_ellipse_convex_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[4],
+    linewidth = 1
+  ) +
+  geom_ribbon(
+    data = sbrs_ellipse_concave_interpolation,
+    aes(
+      x = flow_cfs,
+      ymin = habitat_area_acres_lower,
+      ymax = habitat_area_acres_upper
+    ),
+    fill = interpolation_colors_light[5],
+    alpha = 0.45
+  ) +
+  geom_line(
+    data = sbrs_ellipse_concave_interpolation,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = interpolation_colors_dark[5],
+    linewidth = 1
+  ) +
+  geom_point(
+    data = sbrs_flow_area,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = black,
+    size = 5
+  ) +
+  scale_x_continuous(
+    limits = c(500, 10500),
+    labels = scales::comma,
+    breaks = seq(from = 0, to = 10000, by = 1000),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(1.5, 5.5),
+    breaks = seq(from = 2, to = 5, by = 1),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Interpolated flow-area relationships",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      color = black,
+      size = 22,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(
+      size = 16,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 14, color = black)
+  )
+
+# write out extended axis interpolation plot
+ggsave(
+  filename = "interpolation_7_extended_flows.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 3600,
+  width = 12000,
   units = "px",
   bg = white
 )
@@ -488,6 +1249,13 @@ ggsave(
 ### plot interpolations summary ------------------------------------------------
 
 # create a plot of the interpolations summary
+hline_intercepts <- c(
+  dplyr::filter(sbrs_interpolation_areas, interpolation_method == "linear") |>
+    dplyr::pull(area_lower),
+  dplyr::filter(sbrs_interpolation_areas, interpolation_method == "linear") |>
+    dplyr::pull(area_upper)
+)
+
 ggplot(
   data = sbrs_interpolation_areas,
   aes(x = interpolation_method, y = area, fill = interpolation_method)
@@ -497,20 +1265,21 @@ ggplot(
     aes(ymin = area_lower, ymax = area_upper),
     color = dark_grey,
     linewidth = 1,
-    width = 0.1
+    width = 0.2
   ) +
   geom_hline(
-    yintercept = min(sbrs_interpolation_areas$area_lower),
+    yintercept = hline_intercepts,
     linetype = "dashed",
     color = dark_grey,
     linewidth = 1
   ) +
-  geom_hline(
-    yintercept = max(sbrs_interpolation_areas$area_upper),
-    linetype = "dashed",
-    color = dark_grey,
-    linewidth = 1
-  ) +
+  scale_x_discrete(labels = c(
+    "linear",
+    "cubic spline\n(anchored)",
+    "sine\n(transformed)",
+    "ellipse arc\n(convex)",
+    "ellipse arc\n(concave)"
+  )) +
   scale_y_continuous(
     labels = scales::comma,
     breaks = seq(from = 0, to = 12000, by = 2000),
@@ -527,16 +1296,20 @@ ggplot(
   theme(
     plot.title = element_text(
       color = black,
-      size = 16,
+      size = 22,
       face = "bold",
       margin = margin(b = 20)
     ),
     legend.position = "none",
     axis.line = element_line(color = dark_grey),
-    axis.title.x = element_text(size = 14, margin = margin(t = 20)),
-    axis.title.y = element_text(size = 14, color = black, margin = margin(r = 20)),
-    axis.text.x = element_text(size = 12, color = black, angle = 45, hjust = 1),
-    axis.text.y = element_text(size = 12, color = black),
+    axis.title.x = element_text(size = 16, margin = margin(t = 20)),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text.x = element_text(size = 14, color = black, angle = 45, hjust = 0.5, vjust = 0.6),
+    axis.text.y = element_text(size = 14, color = black),
     panel.grid.major.x = element_blank()
   )
 
@@ -545,9 +1318,9 @@ ggsave(
   filename = "sbrs_interpolation_areas.png",
   path = here::here("workshop", "feather_river", "figs"),
   device = "png",
-  dpi = 320,
-  height = 1800,
-  width = 1800,
+  dpi = 700,
+  height = 4800,
+  width = 4800,
   units = "px",
   bg = white
 )
