@@ -48,6 +48,12 @@ early_impl_projects_all <- tibble::tribble(
   "6-4",  "Upper Rose Bar",               "Yuba",       39.219266, -121.300318
 )
 
+early_impl_projects_all$system <- factor(
+  early_impl_projects_all$system,
+  levels = c("Sacramento", "Feather", "Yuba", "Delta", "American", "Mokelumne",
+             "Tuolumne")
+)
+
 early_impl_projects_sf <- sf::st_as_sf(
   x = dplyr::filter(early_impl_projects_all, !is.na(lat)),
   coords = c("lon", "lat"),
@@ -58,10 +64,10 @@ early_impl_projects_sf <- sf::st_as_sf(
 # write out
 save(
   early_impl_projects_all,
-  here::here("workshop", "early_impl", "data", "early_impl_projects_all.rda")
+  file = here::here("workshop", "early_impl", "data", "early_impl_projects_all.rda")
 )
 
 save(
   early_impl_projects_sf,
-  here::here("workshop", "early_impl", "data", "early_impl_projects_sf.rda")
+  file = here::here("workshop", "early_impl", "data", "early_impl_projects_sf.rda")
 )
