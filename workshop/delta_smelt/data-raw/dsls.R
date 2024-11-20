@@ -25,7 +25,7 @@ colnames(dsls_stations) <- snakecase::to_snake_case(
 
 dsls_stations <- dplyr::filter(
   dsls_stations,
-  !stringr::str_detect(string = notes, pattern = "Only sampled once survey")
+  !stringr::str_detect(string = notes, pattern = "Only sampled once")
 )
 
 # make data spatial
