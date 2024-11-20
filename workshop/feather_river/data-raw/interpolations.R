@@ -66,7 +66,8 @@ anchor_rows <- tibble::tribble(
   ~flow_cfs, ~habitat_area_acres, ~habitat_area_acres_lower, ~habitat_area_acres_upper,
   800,       4.9,                 5 * (1 - moe_prop),        5 * (1 + moe_prop),
   1030,      5.0,                 5 * (1 - moe_prop),        5 * (1 + moe_prop),
-  1400,      4.75,                5 * (1 - moe_prop),        5 * (1 + moe_prop)
+  1400,      4.4,                 5 * (1 - moe_prop),        5 * (1 + moe_prop),
+  2500,      2.0,                 5 * (1 - moe_prop),        5 * (1 + moe_prop),
 )
 
 sbrs_anchored_cubic_spline_interpolation <- dplyr::bind_rows(
@@ -112,7 +113,8 @@ first_sine_interpolation <- interpolate_sine(
   x_end   = as.numeric(sbrs_flow_area[2, "flow_cfs"]),
   y_start = as.numeric(sbrs_flow_area[1, "habitat_area_acres"]),
   y_end   = as.numeric(sbrs_flow_area[2, "habitat_area_acres"]),
-  n = 100
+  n = 100,
+  power = 1
 )
 
 # create a half-cycle sine interpolation between second two coordinate pairs
@@ -121,7 +123,8 @@ second_sine_interpolation <- interpolate_sine(
   x_end   = as.numeric(sbrs_flow_area[3, "flow_cfs"]),
   y_start = as.numeric(sbrs_flow_area[2, "habitat_area_acres"]),
   y_end   = as.numeric(sbrs_flow_area[3, "habitat_area_acres"]),
-  n = 900
+  n = 900,
+  power = 10
 )
 
 # combine into a single sine interpolation
@@ -272,12 +275,12 @@ area_ellipse_concave <- pracma::trapz(
 
 # summarize areas under the curves
 sbrs_interpolation_areas <- tibble::tribble(
-  ~interpolation_method,     ~area,
-  "linear",                  area_linear,
-  "cubic spline (anchored)", area_anchored_cubic_spline,
-  "sine curve",              area_sine,
-  "ellipse arc (convex)",    area_ellipse_convex,
-  "ellipse arc (concave)",   area_ellipse_concave
+  ~interpolation_method,      ~area,
+  "linear",                   area_linear,
+  "cubic spline (anchored)",  area_anchored_cubic_spline,
+  "sine (power transformed)", area_sine,
+  "ellipse arc (convex)",     area_ellipse_convex,
+  "ellipse arc (concave)",    area_ellipse_concave
 )
 
 sbrs_interpolation_areas <- dplyr::mutate(
@@ -287,7 +290,7 @@ sbrs_interpolation_areas <- dplyr::mutate(
     levels = c(
       "linear",
       "cubic spline (anchored)",
-      "sine curve",
+      "sine (power transformed)",
       "ellipse arc (convex)",
       "ellipse arc (concave)"
     )
