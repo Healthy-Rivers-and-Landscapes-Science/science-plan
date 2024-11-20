@@ -33,10 +33,22 @@ microcystis_colors <- c("#2eb22e", "#ffd700", "#ff8c00")
 ### make faceted maps of the microcystis monitoring data -----------------------
 
 # create a function to generate custom facet labels
-custom_labeller <- function(value) {
+facet_labeller <- function(value) {
   labels <- list(
     "summer" = "**summer**<br><br>*May to November*",
     "winter" = "**winter**<br><br>*December to April*"
+  )
+
+  value <- as.character(value)
+
+  sapply(value, function(v) labels[[v]])
+}
+
+legend_label_labeller <- function(value) {
+  labels <- list(
+    "absent" = "absent<br><span style='font-size:10px;display:block;'>*MVI = 1*</span>",
+    "low" = "low<br><span style='font-size:10px;display:block;'>*MVI = 2 or 3*</span>",
+    "high" = "high<br><span style='font-size:10px;display:block;'>*MVI = 4 or 5*</span>"
   )
 
   value <- as.character(value)
@@ -55,19 +67,26 @@ ggplot() +
     shape = 21
   ) +
   scale_fill_manual(
-    name = "Microcystis",
+    name = "Microcystis\nseverity",
+    labels = legend_label_labeller(c("absent", "low", "high")),
     values = microcystis_colors
   ) +
   facet_wrap(
     ~ season,
     ncol = 2,
     strip.position = "bottom",
-    labeller = as_labeller(custom_labeller)
+    labeller = as_labeller(facet_labeller)
   ) +
   labs(
     title = "EMP discrete water quality monitoring: microcystis data",
     subtitle = "90th percentile observation, 2015-2023"
   ) +
+  guides(fill = guide_legend(
+    override.aes = list(size = 4),
+    label.position = "bottom",
+    title.position = "left",
+    title.vjust = 0.7
+  )) +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 14, color = black, face = "bold"),
@@ -82,9 +101,16 @@ ggplot() +
       color = black,
       margin = margin(t = 20)
     ),
-    legend.title = element_text(size = 12, color = black, face = "bold"),
-    legend.text = element_text(size = 12, color = black),
+    legend.title = element_text(
+      size = 12,
+      color = black,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(r = 40)
+    ),
+    legend.text = ggtext::element_markdown(size = 12, color = black, hjust = 0.5),
     legend.position = "bottom",
+    legend.key.spacing.x = unit(x = 1, units = "cm"),
     axis.text = element_blank(),
     panel.grid = element_blank(),
     panel.border = element_rect(
@@ -115,19 +141,26 @@ ggplot() +
     shape = 21
   ) +
   scale_fill_manual(
-    name = "Microcystis",
+    name = "Microcystis\nseverity",
+    labels = legend_label_labeller(c("absent", "low", "high")),
     values = microcystis_colors
   ) +
   facet_wrap(
     ~ season,
     ncol = 2,
     strip.position = "bottom",
-    labeller = as_labeller(custom_labeller)
+    labeller = as_labeller(facet_labeller)
   ) +
   labs(
     title = "EMP discrete water quality monitoring: microcystis data",
     subtitle = "maximum single observation, 2015-2023"
   ) +
+  guides(fill = guide_legend(
+    override.aes = list(size = 4),
+    label.position = "bottom",
+    title.position = "left",
+    title.vjust = 0.7
+  )) +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 14, color = black, face = "bold"),
@@ -142,9 +175,16 @@ ggplot() +
       color = black,
       margin = margin(t = 20)
     ),
-    legend.title = element_text(size = 12, color = black, face = "bold"),
-    legend.text = element_text(size = 12, color = black),
+    legend.title = element_text(
+      size = 12,
+      color = black,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(r = 40)
+    ),
+    legend.text = ggtext::element_markdown(size = 12, color = black, hjust = 0.5),
     legend.position = "bottom",
+    legend.key.spacing.x = unit(1, "cm"),
     axis.text = element_blank(),
     panel.grid = element_blank(),
     panel.border = element_rect(
@@ -186,7 +226,8 @@ ggplot() +
     size = 2
   ) +
   scale_fill_manual(
-    name = "Microcystis",
+    name = "Microcystis\nseverity",
+    labels = legend_label_labeller(c("absent", "low", "high")),
     values = microcystis_colors
   ) +
   scale_color_manual(
@@ -198,15 +239,21 @@ ggplot() +
     ~ season,
     ncol = 2,
     strip.position = "bottom",
-    labeller = as_labeller(custom_labeller)
+    labeller = as_labeller(facet_labeller)
   ) +
   labs(
     title = "EMP discrete water quality monitoring: microcystis data",
     subtitle = "90th percentile observation, 2015-2023"
   ) +
   guides(
-    fill = guide_legend(order = 1),
-    color = guide_legend(order = 2)
+    fill = guide_legend(
+      order = 1,
+      override.aes = list(size = 4)
+    ),
+    color = guide_legend(
+      order = 2,
+      override.aes = list(size = 4)
+    )
   ) +
   theme_minimal() +
   theme(
@@ -222,9 +269,16 @@ ggplot() +
       color = black,
       margin = margin(t = 20)
     ),
-    legend.title = element_text(size = 12, color = black, face = "bold"),
-    legend.text = element_text(size = 12, color = black),
+    legend.title = element_text(
+      size = 12,
+      color = black,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(r = 40)
+    ),
+    legend.text = ggtext::element_markdown(size = 12, color = black, hjust = 0.5),
     legend.position = "bottom",
+    legend.key.spacing.x = unit(1, "cm"),
     axis.text = element_blank(),
     panel.grid = element_blank(),
     panel.border = element_rect(
@@ -260,7 +314,8 @@ ggplot() +
     size = 2
   ) +
   scale_fill_manual(
-    name = "Microcystis",
+    name = "Microcystis\nseverity",
+    labels = legend_label_labeller(c("absent", "low", "high")),
     values = microcystis_colors
   ) +
   scale_color_manual(
@@ -272,15 +327,21 @@ ggplot() +
     ~ season,
     ncol = 2,
     strip.position = "bottom",
-    labeller = as_labeller(custom_labeller)
+    labeller = as_labeller(facet_labeller)
   ) +
   labs(
     title = "EMP discrete water quality monitoring: microcystis data",
     subtitle = "maximum single observation, 2015-2023"
   ) +
   guides(
-    fill = guide_legend(order = 1),
-    color = guide_legend(order = 2)
+    fill = guide_legend(
+      order = 1,
+      override.aes = list(size = 4)
+    ),
+    color = guide_legend(
+      order = 2,
+      override.aes = list(size = 4)
+    )
   ) +
   theme_minimal() +
   theme(
@@ -296,9 +357,16 @@ ggplot() +
       color = black,
       margin = margin(t = 20)
     ),
-    legend.title = element_text(size = 12, color = black, face = "bold"),
-    legend.text = element_text(size = 12, color = black),
+    legend.title = element_text(
+      size = 12,
+      color = black,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(r = 40)
+    ),
+    legend.text = ggtext::element_markdown(size = 12, color = black, hjust = 0.5),
     legend.position = "bottom",
+    legend.key.spacing.x = unit(1, "cm"),
     axis.text = element_blank(),
     panel.grid = element_blank(),
     panel.border = element_rect(
@@ -357,6 +425,7 @@ ggplot(microcystis_all, aes(x = station, fill = severity_cat)) +
   ) +
   scale_fill_manual(
     name = "Microcystis",
+    labels = legend_label_labeller(c("absent", "low", "high")),
     values = microcystis_colors
   ) +
   labs(
@@ -378,9 +447,10 @@ ggplot(microcystis_all, aes(x = station, fill = severity_cat)) +
       face = "italic",
       margin = margin(t = 5, b = 20)
     ),
-    legend.title = element_text(size = 12, color = black, face = "bold"),
-    legend.text = element_text(size = 12, color = black),
+    legend.title = element_text(size = 12, color = black, face = "bold", margin = margin(r = 40)),
+    legend.text = ggtext::element_markdown(size = 12, color = black, hjust = 0.5),
     legend.position = "bottom",
+    legend.key.spacing.x = unit(1, "cm"),
     axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(
       size = 14,
@@ -416,7 +486,8 @@ ggplot(microcystis_all_props, aes(x = station, y = prop, fill = severity_cat)) +
     expand = c(0, 0)
   ) +
   scale_fill_manual(
-    name = "Microcystis",
+    name = "Microcystis\nseverity",
+    labels = legend_label_labeller(c("absent", "low", "high")),
     values = microcystis_colors
   ) +
   labs(
@@ -428,9 +499,9 @@ ggplot(microcystis_all_props, aes(x = station, y = prop, fill = severity_cat)) +
   theme_minimal() +
   theme(
     plot.title = element_text(
-      color = "black",
+      color = black,
       size = 16,
-      face = "bold",
+      face = "bold"
     ),
     plot.subtitle = element_text(
       color = black,
@@ -438,21 +509,35 @@ ggplot(microcystis_all_props, aes(x = station, y = prop, fill = severity_cat)) +
       face = "italic",
       margin = margin(t = 5, b = 20)
     ),
-    legend.title = element_text(size = 12, color = "black", face = "bold"),
-    legend.text = element_text(size = 12, color = "black"),
+    legend.title = element_text(
+      size = 12,
+      color = black,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(r = 40)
+    ),
+    legend.text = ggtext::element_markdown(
+      size = 12,
+      color = black,
+      hjust = 0.5
+    ),
     legend.position = "bottom",
-    axis.line = element_line(color = "darkgrey"),
+    legend.key.spacing.x = unit(1, "cm"),
+    axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(
       size = 14,
-      color = "black",
+      color = black,
       margin = margin(t = 20)
     ),
     axis.title.y = element_text(
       size = 14,
-      color = "black",
+      color = black,
       margin = margin(r = 20)
     ),
-    axis.text = element_text(size = 12, color = "black")
+    axis.text = element_text(
+      size = 12,
+      color = black
+    )
   )
 
 ggsave(
@@ -468,54 +553,66 @@ ggsave(
 
 # create a stacked bar chart faceted by season
 ggplot(
-  microcystis_all,
-  aes(x = station, fill = severity_cat)
+  microcystis_all_season_props,
+  aes(x = station, y = season_prop, fill = severity_cat)
 ) +
-  geom_bar() +
+  geom_bar(stat = "identity") +
   scale_x_discrete(guide = guide_axis(angle = 90)) +
   scale_y_continuous(
-    limits = c(0, 60),
-    breaks = seq(from = 0, to = 60, by = 10),
+    breaks = seq(from = 0, to = 1, by = 0.2),
+    labels = scales::percent_format(accuracy = 1),
     expand = c(0, 0)
   ) +
   scale_fill_manual(
-    name = "Microcystis",
+    name = "Microcystis\nseverity",
+    labels = legend_label_labeller(c("absent", "low", "high")),  # Apply custom labels
     values = microcystis_colors
   ) +
   facet_wrap(
     ~ season,
     nrow = 2,
     strip.position = "top",
-    labeller = as_labeller(custom_labeller)
+    labeller = as_labeller(facet_labeller)
   ) +
   labs(
     title = "Microcystis observations by station and season",
     subtitle = "2015-2023",
     x = "station (ordered west to east)",
-    y = "number of observations"
+    y = "proportion of observations"
   ) +
   theme_minimal() +
   theme(
     plot.title = element_text(
       color = "black",
       size = 16,
-      face = "bold",
+      face = "bold"
     ),
     plot.subtitle = element_text(
-      color = black,
+      color = "black",
       size = 14,
       face = "italic",
       margin = margin(t = 5, b = 20)
     ),
-    panel.spacing = unit(x = 1, units = "cm"),
+    panel.spacing = unit(1, "cm"),  # Match spacing between facets
     strip.text = ggtext::element_markdown(
       size = 12,
       color = "black",
       margin = margin(b = 10)
     ),
-    legend.title = element_text(size = 12, color = "black", face = "bold"),
-    legend.text = element_text(size = 12, color = "black"),
-    legend.position = "bottom",
+    legend.title = element_text(
+      size = 12,
+      color = "black",
+      face = "bold",
+      hjust = 0.5,  # Center-align legend title
+      margin = margin(r = 40)  # Add spacing below legend title
+    ),
+    legend.text = ggtext::element_markdown(
+      size = 12,
+      color = "black",
+      hjust = 0.5  # Center-align legend text
+    ),
+    legend.position = "bottom",       # Position legend at bottom
+    legend.key.spacing.x = unit(1, "cm"),  # Add spacing between legend items
     axis.line = element_line(color = "darkgrey"),
     axis.title.x = element_text(
       size = 14,
@@ -527,7 +624,10 @@ ggplot(
       color = "black",
       margin = margin(r = 20)
     ),
-    axis.text = element_text(size = 12, color = "black")
+    axis.text = element_text(
+      size = 12,
+      color = "black"
+    )
   )
 
 ggsave(
@@ -561,7 +661,7 @@ ggplot(
     ~ season,
     nrow = 2,
     strip.position = "top",
-    labeller = as_labeller(custom_labeller)
+    labeller = as_labeller(facet_labeller)
   ) +
   labs(
     title = "Microcystis observations by station and season",
