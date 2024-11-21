@@ -32,9 +32,9 @@ trace_start_pts <- tibble::tribble(
   "thermalito_forebay_inflow",   -121.580195, 39.531312, "UM",  30,
   "hatchery_outtake",            -121.547511, 39.520641, "DM",  30,
   "thermalito_afterbay_release", -121.639103, 39.457570, "DM",  0.1,
-  "feather_yuba_confluence",     -121.596702, 39.129015, "UM",  25,
-  "feather_bear_confluence",     -121.577792, 38.939316, "UM",  25,
-  "feather_sac_confluence",      -121.624698, 38.788601, "UM",  120,
+  "feather_yuba_confluence",     -121.596702, 39.129015, "UM",  40,
+  "feather_bear_confluence",     -121.577792, 38.939316, "UM",  35,
+  "feather_sac_confluence",      -121.624698, 38.788601, "UM",  200,
   "sac_smf",                     -121.634237, 38.690365, "UM",  75
 )
 
@@ -280,6 +280,12 @@ ggsave(
 
 # create a map
 ggplot() +
+  ggspatial::annotation_map_tile(
+    type = "cartolight",
+    zoom = 9,
+    zoomin = -5,
+    forcedownload = TRUE
+  ) +
   geom_sf(
     data = oroville_thermalito,
     color = black,
@@ -293,12 +299,6 @@ ggplot() +
     fill = black,
     shape = 22,
     size = 5
-  ) +
-  geom_sf_text(
-    data = yuba_city,
-    aes(label = label),
-    nudge_x = -0.1,
-    size = 6
   ) +
   geom_sf(
     data = restoration_polygons,
