@@ -54,3 +54,6 @@ workshop/early_impl/data-raw/nhdplushr/
 workshop/early_impl/data/flowlines.rda
 workshop/feather_river/data-raw/nhdplushr/
 workshop/feather_river/data/flowlines.rda
+
+# cached files
+rosm.cache/
