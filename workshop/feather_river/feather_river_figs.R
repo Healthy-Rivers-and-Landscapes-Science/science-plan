@@ -1248,7 +1248,7 @@ ggsave(
 
 ### plot interpolations summary ------------------------------------------------
 
-# create a plot of the interpolations summary
+# create y intercept values for plotting horizontal lines
 hline_intercepts <- c(
   dplyr::filter(sbrs_interpolation_areas, interpolation_method == "linear") |>
     dplyr::pull(area_lower),
@@ -1256,51 +1256,179 @@ hline_intercepts <- c(
     dplyr::pull(area_upper)
 )
 
-ggplot(
-  data = sbrs_interpolation_areas,
-  aes(x = interpolation_method, y = area, fill = interpolation_method)
-) +
-  geom_bar(stat = "identity") +
-  geom_errorbar(
-    aes(ymin = area_lower, ymax = area_upper),
-    color = dark_grey,
-    linewidth = 1,
-    width = 0.2
+# create plots that sequentially add info
+plot_list <- lapply(1:nrow(sbrs_interpolation_areas), function(i) {
+
+  # modify data to "hide" bars beyond the current step
+  plot_data <- sbrs_interpolation_areas %>%
+    mutate(
+      area = ifelse(row_number() <= i, area, NA),
+      area_lower = ifelse(row_number() <= i, area_lower, NA),
+      area_upper = ifelse(row_number() <= i, area_upper, NA)
+    )
+
+  # dynamically set x-axis labels for the revealed bars
+  x_labels <- sapply(1:nrow(sbrs_interpolation_areas), function(j) {
+    if (j <= i) {
+      c("linear", "cubic spline\n(anchored)", "sine\n(transformed)", "ellipse arc\n(convex)", "ellipse arc\n(concave)")[j]
+    } else {
+      ""
+    }
+  })
+
+  # generate the plot
+  ggplot(
+    data = plot_data,
+    aes(x = interpolation_method, y = area, fill = interpolation_method)
   ) +
-  geom_hline(
-    yintercept = hline_intercepts,
-    linetype = "dashed",
-    color = dark_grey,
+    geom_bar(stat = "identity", na.rm = TRUE) +
+    geom_errorbar(
+      aes(ymin = area_lower, ymax = area_upper),
+      color = "darkgrey",
+      linewidth = 1,
+      width = 0.2,
+      na.rm = TRUE
+    ) +
+    geom_hline(
+      yintercept = hline_intercepts,
+      linetype = "dashed",
+      color = "darkgrey",
+      linewidth = 1
+    ) +
+    scale_x_discrete(labels = x_labels) +
+    scale_y_continuous(
+      labels = scales::comma,
+      breaks = seq(from = 0, to = 12000, by = 2000),
+      expand = c(0, 0),
+      limits = c(0, 11000)
+    ) +
+    scale_fill_manual(values = interpolation_colors_light) +
+    labs(
+      title = "Integrated flow-habitat area curves",
+      x = "interpolation method",
+      y = "area under the curve"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(
+        color = "black",
+        size = 22,
+        face = "bold",
+        margin = margin(b = 20)
+      ),
+      legend.position = "none",
+      axis.line = element_line(color = "darkgrey"),
+      axis.title.x = element_text(size = 16, margin = margin(t = 20)),
+      axis.title.y = element_text(
+        size = 16,
+        color = "black",
+        margin = margin(r = 20)
+      ),
+      axis.text.x = element_text(
+        size = 14,
+        color = "black",
+        angle = 45,
+        hjust = 0.5,
+        vjust = 0.6
+      ),
+      axis.text.y = element_text(size = 14, color = "black"),
+      panel.grid.major.x = element_blank()
+    )
+})
+
+# write out area plots
+lapply(seq_along(plot_list), function(i) {
+  ggsave(
+    plot = plot_list[[i]],
+    filename = paste0("area_bar_chart_", i, ".png"),
+    path = here::here("workshop", "feather_river", "figs"),
+    device = "png",
+    dpi = 700,
+    height = 4800,
+    width = 4800,
+    units = "px",
+    bg = white
+  )
+})
+
+
+
+
+
+### plot a dummy example of best available science-based accounting ------------
+
+# create additional curves
+
+bas_example_curves <- tibble::tribble(
+  ~curve,         ~x,    ~y,
+  "sbrs",         650,   4.2,
+  "sbrs",         725,   4.725,
+  "sbrs",         3000,  2.625,
+  "lower_river",  1000,  2.9,
+  "lower_river",  3600,  4.1,
+  "lower_river",  5200,  4.9,
+  "lower_river",  9200,  4.6,
+  "lower_river",  10400, 2.0,
+  "side_channel", 700,   5.2,
+  "side_channel", 950,   4.7,
+  "side_channel", 1500,  4.2,
+  "side_channel", 2000,  2.5,
+  "side_channel", 3000,  2.5,
+  "side_channel", 4000,  2.5,
+  "middle_river", 600,   4.0,
+  "middle_river", 1800,  4.7,
+  "middle_river", 5200,  3.1,
+  "middle_river", 6300,  2.9,
+  "middle_river", 7400,  2.3
+)
+
+bas_example_curves$curve <- factor(
+  bas_example_curves$curve,
+  levels = c("sbrs", "side_channel", "middle_river", "lower_river")
+)
+
+ggplot(data = bas_example_curves) +
+  ggforce::geom_mark_hull(
+    aes(x = x, y = y),
+    fill = mid_grey,
+    color = NA,
+    alpha = 0.5
+  ) +
+  geom_line(
+    aes(x = x, y = y, color = curve),
     linewidth = 1
   ) +
-  scale_x_discrete(labels = c(
-    "linear",
-    "cubic spline\n(anchored)",
-    "sine\n(transformed)",
-    "ellipse arc\n(convex)",
-    "ellipse arc\n(concave)"
-  )) +
-  scale_y_continuous(
+  geom_point(
+    aes(x = x, y = y, color = curve),
+    size = 4
+  ) +
+  scale_color_manual(
+    values = c(black, flow_station_colors),
+    labels = c("Scientific Basis\nReport Supplement", "side channel",
+               "middle river", "lower river")
+  ) +
+  scale_x_continuous(
+    name = "discharge (cfs)",
     labels = scales::comma,
-    breaks = seq(from = 0, to = 12000, by = 2000),
-    expand = c(0, 0),
-    limits = c(0, 11000)
+    limits = c(0, 11000),
+    breaks = seq(from = 0, to = 10000, by = 1000),
+    expand = c(0, 0)
   ) +
-  scale_fill_manual(values = interpolation_colors_light) +
-  labs(
-    title = "Integrated flow-habitat area curves",
-    x = "interpolation method",
-    y = "area under the curve",
+  scale_y_continuous(
+    name = "habitat area (acres)",
+    expand = c(0.1, 0.1)
   ) +
+  labs(title = "what should I call this?") +
   theme_minimal() +
   theme(
     plot.title = element_text(
-      color = black,
+      color = "red",
       size = 22,
       face = "bold",
       margin = margin(b = 20)
     ),
-    legend.position = "none",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 16, color = black),
     axis.line = element_line(color = dark_grey),
     axis.title.x = element_text(size = 16, margin = margin(t = 20)),
     axis.title.y = element_text(
@@ -1308,19 +1436,24 @@ ggplot(
       color = black,
       margin = margin(r = 20)
     ),
-    axis.text.x = element_text(size = 14, color = black, angle = 45, hjust = 0.5, vjust = 0.6),
+    axis.text.x = element_text(
+      size = 14,
+      color = black,
+      angle = 45,
+      hjust = 0.5,
+      vjust = 0.6
+    ),
     axis.text.y = element_text(size = 14, color = black),
     panel.grid.major.x = element_blank()
   )
 
-# write out interpolation summary plot
 ggsave(
-  filename = "sbrs_interpolation_areas.png",
+  filename = "bas_curves.png",
   path = here::here("workshop", "feather_river", "figs"),
   device = "png",
   dpi = 700,
-  height = 4800,
-  width = 4800,
+  height = 3600,
+  width = 6000,
   units = "px",
   bg = white
 )
