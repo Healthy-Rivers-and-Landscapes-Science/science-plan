@@ -39,6 +39,7 @@ watershed_colors <- colorspace::lighten(
 
 # make the map
 ggplot() +
+  geom_sf(data = california_cropped, fill = light_grey, color = mid_grey) +
   geom_sf(data = delta, fill = black, color = black) +
   geom_sf(data = waterbodies, fill = black, color = black) +
   geom_sf(data = flowlines, color = black) +
@@ -51,13 +52,19 @@ ggplot() +
     size = 3
   ) +
   scale_fill_manual(
-    name = "River",
+    name = "HRL system",
     values = system_colors
   ) +
   labs(title = "Early implementation projects") +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 22, color = black, face = "bold"),
+    plot.title = element_text(size = 24, color = black, face = "bold"),
+    plot.subtitle = element_text(
+      size = 14,
+      color = black,
+      face = "italic",
+      margin = margin(t = 5)
+    ),
     axis.text = element_blank(),
     legend.title = element_text(size = 16, color = black, face = "bold"),
     legend.text = element_text(size = 14, color = black),
