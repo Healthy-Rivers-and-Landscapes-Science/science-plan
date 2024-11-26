@@ -42,8 +42,36 @@ sbrs_flow_area <- dplyr::select(
   habitat_area_acres
 )
 
+sbrs_flow_area <- dplyr::mutate(
+  sbrs_flow_area,
+  val_type = "sbrs"
+)
+
+# create a version that extends hypothetical points across a wider discharge
+# range; final point at 9500.01 is needed to complete loess smoothing in fig
+sbrs_flow_area_extended <- tibble::tribble(
+  ~flow_cfs, ~habitat_area_acres, ~val_type,
+  1000,      4.8,                 "bas_new",
+  1600,      4.3,                 "bas_new",
+  2000,      3.2,                 "bas_new",
+  2400,      3.0,                 "bas_new",
+  3800,      2.4,                 "bas_new",
+  5000,      2.9,                 "bas_new",
+  7200,      3.4,                 "bas_new",
+  7800,      4.1,                 "bas_new",
+  8200,      4.4,                 "bas_new",
+  9000,      5.1,                 "bas_new",
+  9500,      4.8,                 "bas_new",
+  9500.01,   4.8,                 "bas_new"
+)
+
 # write out habitat-flow area data
 save(
   sbrs_flow_area,
   file = here::here("workshop", "feather_river", "data", "sbrs_flow_area.rda")
+)
+
+save(
+  sbrs_flow_area_extended,
+  file = here::here("workshop", "feather_river", "data", "sbrs_flow_area_extended.rda")
 )

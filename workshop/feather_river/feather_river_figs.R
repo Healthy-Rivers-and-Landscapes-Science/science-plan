@@ -75,6 +75,7 @@ feather_flowlines <- dplyr::filter(flowlines, id %in% trace_ids)
 
 ### create polygons to represent restoration sites as though the are parcels ---
 
+# generate a scale factor to make it easier to resize en masse
 scale_factor <- 0.04
 
 restoration_polygons <- list(
@@ -150,6 +151,8 @@ black <- "#000000"
 
 red <- "#f4684e"
 yellow <- "#f1ee00"
+green <- "#2cbb02"
+blue <- "#00afda"
 
 # create colors for flow stations
 flow_station_colors <- c("#f4684e", "#4042ef", "#f4a611")
@@ -195,8 +198,8 @@ interpolation_colors_dark <- colorspace::darken(
 
 flow_area_x_lower <- 500
 flow_area_x_upper <- 3500
-flow_area_y_lower <- 2.5
-flow_area_y_upper <- 5.0
+flow_area_y_lower <- 1.5
+flow_area_y_upper <- 5.5
 
 
 
@@ -303,27 +306,36 @@ ggplot() +
   geom_sf(
     data = restoration_polygons,
     aes(shape = "potential\nrestoration site"),
-    fill = yellow,
+    fill = green,
     color = black,
     linewidth = 1,
     size = 5
   ) +
   geom_sf(
     data = flow_stations,
-    aes(shape = "flow gage"),
-    fill = red,
+    aes(fill = name),
     color = black,
+    shape = 24,
     stroke = 1.5,
     size = 5
   ) +
+  scale_fill_manual(
+    values = flow_station_colors,
+    guide = guide_legend(override.aes = list(shape = 24, size = 5))
+  ) +
   scale_shape_manual(
-    values = c("flow gage" = 24, "potential\nrestoration site" = 22),
+    values = c("potential\nrestoration site" = 22),
     guide = guide_legend(byrow = TRUE, override.aes = list(size = 5))
   ) +
   labs(title = "Feather River gaging and\nproposed habitat restoration") +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 24, color = black, face = "bold"),
+    plot.title = element_text(
+      size = 24,
+      color = black,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
     axis.title = element_blank(),
     axis.text = element_blank(),
     legend.title = element_blank(),
@@ -332,6 +344,7 @@ ggplot() +
     legend.key.spacing.y = unit(0.5, "cm"),
     panel.grid = element_blank()
   )
+
 
 # write out the map
 ggsave(
@@ -363,7 +376,7 @@ flows_clipped <- dplyr::mutate(
 hydrographs <- ggplot(
   data = dplyr::filter(
     flows_clipped,
-    water_year_day >= 93 & water_year_day <= 305
+    water_year_day >= 124 & water_year_day <= 273
   ),
   aes(
     x = water_year_day,
@@ -372,20 +385,11 @@ hydrographs <- ggplot(
     group = water_year
   )) +
   geom_vline(
-    xintercept = c(93, 124, 152, 183, 213, 244, 274),
+    xintercept = c(124, 152, 182, 213, 243, 273),
     color = "#d9d9d9",
     linewidth = 0.5
   ) +
-  annotate(
-    "rect",
-    xmin = 124,
-    xmax = 274,
-    ymin = -Inf,
-    ymax = Inf,
-    fill = mid_grey,
-    alpha = 0.45
-  ) +
-  ggplot2::geom_line(linewidth = 0.75) +
+  geom_line(linewidth = 0.75) +
   geom_hline(
     yintercept = c(min(sbrs_flow_area$flow_cfs), max(sbrs_flow_area$flow_cfs)),
     color = black,
@@ -393,9 +397,9 @@ hydrographs <- ggplot(
     linetype = "dashed"
   ) +
   scale_x_continuous(
-    breaks = c(108.5, 138, 167.5, 198, 228.5, 259, 289.5),
-    labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"),
-    limits = c(93, 304),
+    breaks = c(138, 167, 197, 227, 258),
+    labels = c("Feb", "Mar", "Apr", "May", "Jun"),
+    limits = c(124, 273),
     expand = c(0, 0)
   ) +
   scale_y_continuous(
@@ -405,7 +409,7 @@ hydrographs <- ggplot(
     expand = c(0, 0)
   ) +
   scale_color_identity() +
-  facet_wrap(~ location_id, ncol = 1) +
+  facet_wrap(~ location_id, ncol = 1, scales = "free_x") +
   labs(
     title = "Feather River hydrographs",
     y = "dischage (cfs)",
@@ -435,8 +439,6 @@ hydrographs <- ggplot(
     panel.grid.major.x = element_blank(),
     panel.grid.minor = element_blank()
   )
-
-# create a standalone legend for the water years in shades of grey and black
 hydrograph_legend_data <- data.frame(
   water_year = rep(c("2021-2022", "2022-2023", "2023-2024"), each = 2),
   x = rep(c(1, 2), times = 3),
@@ -449,9 +451,9 @@ hydrograph_legend_colors <- setNames(
 )
 
 hydrographs_legend <- ggplot(
-  data = hydrograph_legend_data,
-  aes(x = x, y = y, color = water_year, group = water_year)
-) +
+    data = hydrograph_legend_data,
+    aes(x = x, y = y, color = water_year, group = water_year)
+  ) +
   geom_line(linewidth = 2) +
   scale_color_manual(
     values = hydrograph_legend_colors,
@@ -489,6 +491,91 @@ ggsave(
 
 
 
+### create faceted box plots of hydrograph data --------------------------------
+
+ggplot(
+  data = dplyr::filter(
+    flows,
+    water_year_day >= 124 & water_year_day <= 273
+    )
+  ) +
+  geom_boxplot(
+    aes(x = "", y = parameter_value, fill = location_id),
+    width = 0.5
+  ) +
+  geom_hline(
+    yintercept = c(min(sbrs_flow_area$flow_cfs), max(sbrs_flow_area$flow_cfs)),
+    color = black,
+    linewidth = 0.75,
+    linetype = "dashed"
+  ) +
+  scale_y_continuous(
+    labels = scales::comma,
+    breaks = seq(from = 0, to = y_limit, by = 5000),
+    limits = c(0, y_limit),
+    expand = c(0, 0)
+  ) +
+  scale_fill_manual(values = colorspace::lighten(
+    flow_station_colors,
+    amount = 0.4)
+  ) +
+  facet_wrap(~ location_id, ncol = 1, scales = "free_y") +
+  labs(
+    title = "Feather River discharge",
+    subtitle = "February 1 to June 30\nwater years 2021-22, 2022-23, and 2023-24",
+    y = "dischage (cfs)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      size = 24,
+      color = black,
+      face = "bold",
+      margin = margin(b = 10)
+    ),
+    plot.title.position = "plot",
+    plot.subtitle = element_text(
+      size = 14,
+      color = "black",
+      face = "italic",
+      margin = margin(b = 10)
+    ),
+    strip.text = element_text(
+      size = 18,
+      color = black,
+      face = "bold",
+      margin = margin(t = 20, b = 10)
+    ),
+    legend.position = "none",
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_text(
+      size = 16,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text.y = element_text(size = 14, color = black),
+    panel.grid.major.x = element_blank()
+  )
+
+# write out the boxplots
+ggsave(
+  filename = "feather_river_discharge_boxplots.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 6800,
+  width = 3000,
+  units = "px",
+  bg = white
+)
+
+
+
+
+
 ### plot interpolations --------------------------------------------------------
 
 # create a plot showing a linear interpolation
@@ -506,13 +593,13 @@ ggplot() +
     size = 5
   ) +
   scale_x_continuous(
-    limits = c(500, 3250),
+    limits = c(flow_area_x_lower, flow_area_x_upper),
     labels = scales::comma,
     breaks = seq(from = 500, to = 3000, by = 500),
     expand = c(0, 0)
   ) +
   scale_y_continuous(
-    limits = c(1.5, 5.5),
+    limits = c(flow_area_y_lower, flow_area_y_upper),
     breaks = seq(from = 2, to = 5, by = 1),
     expand = c(0, 0)
   ) +
@@ -580,13 +667,13 @@ ggplot() +
     size = 5
   ) +
   scale_x_continuous(
-    limits = c(500, 3250),
+    limits = c(flow_area_x_lower, flow_area_x_upper),
     labels = scales::comma,
     breaks = seq(from = 500, to = 3000, by = 500),
     expand = c(0, 0)
   ) +
   scale_y_continuous(
-    limits = c(1.5, 5.5),
+    limits = c(flow_area_y_lower, flow_area_y_upper),
     breaks = seq(from = 2, to = 5, by = 1),
     expand = c(0, 0)
   ) +
@@ -670,13 +757,13 @@ ggplot() +
     size = 5
   ) +
   scale_x_continuous(
-    limits = c(500, 3250),
+    limits = c(flow_area_x_lower, flow_area_x_upper),
     labels = scales::comma,
     breaks = seq(from = 500, to = 3000, by = 500),
     expand = c(0, 0)
   ) +
   scale_y_continuous(
-    limits = c(1.5, 5.5),
+    limits = c(flow_area_y_lower, flow_area_y_upper),
     breaks = seq(from = 2, to = 5, by = 1),
     expand = c(0, 0)
   ) +
@@ -776,13 +863,13 @@ ggplot() +
     size = 5
   ) +
   scale_x_continuous(
-    limits = c(500, 3250),
+    limits = c(flow_area_x_lower, flow_area_x_upper),
     labels = scales::comma,
     breaks = seq(from = 500, to = 3000, by = 500),
     expand = c(0, 0)
   ) +
   scale_y_continuous(
-    limits = c(1.5, 5.5),
+    limits = c(flow_area_y_lower, flow_area_y_upper),
     breaks = seq(from = 2, to = 5, by = 1),
     expand = c(0, 0)
   ) +
@@ -898,13 +985,13 @@ ggplot() +
     size = 5
   ) +
   scale_x_continuous(
-    limits = c(500, 3250),
+    limits = c(flow_area_x_lower, flow_area_x_upper),
     labels = scales::comma,
     breaks = seq(from = 500, to = 3000, by = 500),
     expand = c(0, 0)
   ) +
   scale_y_continuous(
-    limits = c(1.5, 5.5),
+    limits = c(flow_area_y_lower, flow_area_y_upper),
     breaks = seq(from = 2, to = 5, by = 1),
     expand = c(0, 0)
   ) +
@@ -1036,13 +1123,13 @@ ggplot() +
     size = 5
   ) +
   scale_x_continuous(
-    limits = c(500, 3250),
+    limits = c(flow_area_x_lower, flow_area_x_upper),
     labels = scales::comma,
     breaks = seq(from = 500, to = 3000, by = 500),
     expand = c(0, 0)
   ) +
   scale_y_continuous(
-    limits = c(1.5, 5.5),
+    limits = c(flow_area_y_lower, flow_area_y_upper),
     breaks = seq(from = 2, to = 5, by = 1),
     expand = c(0, 0)
   ) +
@@ -1199,7 +1286,7 @@ ggplot() +
     expand = c(0, 0)
   ) +
   scale_y_continuous(
-    limits = c(1.5, 5.5),
+    limits = c(flow_area_y_lower, flow_area_y_upper),
     breaks = seq(from = 2, to = 5, by = 1),
     expand = c(0, 0)
   ) +
@@ -1454,6 +1541,153 @@ ggsave(
   dpi = 700,
   height = 3600,
   width = 6000,
+  units = "px",
+  bg = white
+)
+
+
+
+
+
+### create a plot that imagines a flow-area curve across the full range --------
+
+ggplot() +
+  geom_point(
+    data = sbrs_flow_area,
+    aes(x = flow_cfs, y = habitat_area_acres),
+    color = red,
+    size = 7
+  ) +
+  scale_x_continuous(
+    limits = c(500, 10500),
+    labels = scales::comma,
+    breaks = seq(from = 0, to = 10000, by = 1000),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(flow_area_y_lower, flow_area_y_upper),
+    breaks = seq(from = 2, to = 5, by = 1),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "Flow-area curve refinements through learning",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      color = black,
+      size = 32,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
+    legend.position = "bottom",
+    legend.title = element_text(
+      size = 24,
+      face = "bold",
+      margin = margin(r = 20)
+    ),
+    legend.text = element_text(size = 24),
+    legend.margin = margin(t = 10),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(
+      size = 24,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 24,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 18, color = black)
+  )
+
+ggsave(
+  filename = "bas_pre_learning_flow_area.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 4200,
+  width = 12000,
+  units = "px",
+  bg = white
+)
+
+sbrs_flow_area_all <- rbind(sbrs_flow_area, sbrs_flow_area_extended)
+
+ggplot(data = sbrs_flow_area_all) +
+  geom_smooth(
+    aes(x = flow_cfs, y = habitat_area_acres),
+    method = "loess",
+    se = TRUE,
+    color = NA,
+    linewidth = 1
+  ) +
+  geom_point(
+    aes(x = flow_cfs, y = habitat_area_acres, color = val_type),
+    size = 7
+  ) +
+  scale_x_continuous(
+    limits = c(500, 10500),
+    labels = scales::comma,
+    breaks = seq(from = 0, to = 10000, by = 1000),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(flow_area_y_lower, flow_area_y_upper),
+    breaks = seq(from = 2, to = 5, by = 1),
+    expand = c(0, 0)
+  ) +
+  scale_color_manual(
+    name = "point type",
+    values = c(black, red),
+    labels = c("empirical", "expert opinion (SBRS)"),
+    guide = guide_legend(override.aes = list(size = 10))
+  ) +
+  labs(
+    title = "Flow-area curve refinements through learning",
+    x = "discharge (cfs)",
+    y = "habitat area (acres)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      color = black,
+      size = 32,
+      face = "bold",
+      margin = margin(b = 20)
+    ),
+    legend.position = "bottom",
+    legend.title = element_text(
+      size = 24,
+      face = "bold",
+      margin = margin(r = 20)
+    ),
+    legend.text = element_text(size = 24),
+    legend.margin = margin(t = 10),
+    axis.line = element_line(color = dark_grey),
+    axis.title.x = element_text(
+      size = 24,
+      color = black,
+      margin = margin(t = 20)
+    ),
+    axis.title.y = element_text(
+      size = 24,
+      color = black,
+      margin = margin(r = 20)
+    ),
+    axis.text = element_text(size = 18, color = black)
+  )
+
+ggsave(
+  filename = "bas_learning_flow_area.png",
+  path = here::here("workshop", "feather_river", "figs"),
+  device = "png",
+  dpi = 700,
+  height = 4200,
+  width = 12000,
   units = "px",
   bg = white
 )
