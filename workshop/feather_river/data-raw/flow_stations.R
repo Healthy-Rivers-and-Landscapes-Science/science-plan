@@ -11,7 +11,12 @@ flow_stations <- tibble::tribble(
 
 flow_stations <- dplyr::mutate(
   flow_stations,
-  location_id = factor(location_id, levels = c("TFB", "GRL", "FSB"))
+  location_id = factor(location_id, levels = c("TFB", "GRL", "FSB")),
+  name = factor(name, levels = c(
+    "Thermalito Fish Barrier",
+    "Gridley",
+    "Star Bend"
+  ))
 )
 
 flow_stations <- sf::st_as_sf(
