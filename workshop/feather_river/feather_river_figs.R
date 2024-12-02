@@ -642,8 +642,15 @@ ggsave(
   bg = white
 )
 
-# create a plot showing a linear interpolation with a margin of error
+# create a plot showing a linear interpolation with a margin of error and shaded
+# area under the curve
 ggplot() +
+  geom_ribbon(
+    data = sbrs_linear_interpolation,
+    aes(x = flow_cfs, ymin = min(flow_area_y_lower), ymax = habitat_area_acres),
+    fill = colorspace::lighten(interpolation_colors_light[1], amount = 0.65),
+    alpha = 0.75
+  ) +
   geom_ribbon(
     data = sbrs_linear_interpolation,
     aes(
