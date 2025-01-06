@@ -46,6 +46,12 @@ microcystis_all <- dplyr::filter(
   date >= as.Date("2015-01-01")
 )
 
+# fix incorrect values, as per communication with Ted Flynn
+microcystis_all <- dplyr::mutate(
+  microcystis_all,
+  microcystis = dplyr::if_else(station %in% c("D41", "D41A"), 1, microcystis)
+)
+
 # add columns needed for analysis
 microcystis_all <- dplyr::mutate(
   microcystis_all,
